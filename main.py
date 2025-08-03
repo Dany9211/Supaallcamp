@@ -282,16 +282,16 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 first_goal_minute_home = min([g for g in home_goals if start_minute <= g <= end_minute] or [float('inf')])
                 first_goal_minute_away = min([g for g in away_goals if start_minute <= g <= end_minute] or [float('inf')])
                 
-                # CORREZIONE: Assegna il gol alla squadra selezionata, indipendentemente se è "home" o "away" nel record storico
+                # Assegna il gol alla squadra selezionata
                 if first_goal_minute_home < first_goal_minute_away:
                     if row["home_team"] == home_team_name:
                         first_goal_stats[home_team_name] += 1
-                    else: # Questo significa che la squadra "away_team_selected" ha segnato il primo gol (in uno dei suoi match storici)
+                    else: 
                         first_goal_stats[away_team_name] += 1
                 elif first_goal_minute_away < first_goal_minute_home:
                     if row["away_team"] == away_team_name:
                         first_goal_stats[away_team_name] += 1
-                    else: # Questo significa che la squadra "home_team_selected" ha segnato il primo gol (in uno dei suoi match storici)
+                    else: 
                         first_goal_stats[home_team_name] += 1
                 else:
                     first_goal_stats["Nessun gol"] += 1
@@ -320,7 +320,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 last_goal_minute_home = max([g for g in home_goals if start_minute <= g <= end_minute] or [-1])
                 last_goal_minute_away = max([g for g in away_goals if start_minute <= g <= end_minute] or [-1])
 
-                # CORREZIONE: Assegna il gol alla squadra selezionata
+                # Assegna il gol alla squadra selezionata
                 if last_goal_minute_home > last_goal_minute_away:
                     if row["home_team"] == home_team_name:
                         last_goal_stats[home_team_name] += 1
@@ -518,6 +518,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     # Chiamata alle funzioni statistiche con i dati filtrati
                     calcola_over_goals(df_combined_dynamic_ht, "gol_home_ht", "gol_away_ht", f"HT (dopo {current_minute_dynamic_ht}')")
                     calcola_winrate(df_combined_dynamic_ht, "risultato_ht", f"HT (dopo {current_minute_dynamic_ht}')")
+                    mostra_risultati_esatti(df_combined_dynamic_ht, "risultato_ht", f"Risultati Esatti HT (dopo {current_minute_dynamic_ht}')")
                     calcola_btts(df_combined_dynamic_ht, "gol_home_ht", "gol_away_ht", f"HT (dopo {current_minute_dynamic_ht}')")
                     calcola_primo_gol_stats(df_combined_dynamic_ht, home_team_selected, away_team_selected, f"Prossimo gol (dopo {current_minute_dynamic_ht}')", current_minute_dynamic_ht + 1, 45)
                     calcola_last_to_score(df_combined_dynamic_ht, current_minute_dynamic_ht + 1, 45, home_team_selected, away_team_selected)
@@ -561,6 +562,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     # Chiamata alle funzioni statistiche con i dati filtrati
                     calcola_over_goals(df_combined_dynamic_ft, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic_ft}')")
                     calcola_winrate(df_combined_dynamic_ft, "risultato_ft", f"FT (dopo {current_minute_dynamic_ft}')")
+                    mostra_risultati_esatti(df_combined_dynamic_ft, "risultato_ft", f"Risultati Esatti FT (dopo {current_minute_dynamic_ft}')")
                     calcola_btts(df_combined_dynamic_ft, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic_ft}')")
                     calcola_primo_gol_stats(df_combined_dynamic_ft, home_team_selected, away_team_selected, f"Prossimo gol (dopo {current_minute_dynamic_ft}')", current_minute_dynamic_ft + 1, 90)
                     calcola_last_to_score(df_combined_dynamic_ft, current_minute_dynamic_ft + 1, 90, home_team_selected, away_team_selected)
