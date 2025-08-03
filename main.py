@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 # Configurazione della pagina
-st.set_page_config(page_title="Analisi Squadre Combinate", layout="wide")
+st.set_page_page_config(page_title="Analisi Squadre Combinate", layout="wide")
 st.title("Analisi Statistiche Combinate per Squadra")
 
 # --- Funzione di connessione al database (cacheata per efficienza) ---
@@ -646,21 +646,23 @@ if selected_league != "Seleziona...":
             
             # --- ESECUZIONE E VISUALIZZAZIONE STATS DINAMICHE ---
             st.markdown("---")
-            st.header("Statistiche Dinamiche (basate su un intervallo di minutaggio)")
+            st.header("Statistiche Dinamiche")
+            st.subheader("Filtra le partite per un intervallo di tempo e un risultato specifico")
 
             col_sliders_1, col_sliders_2 = st.columns(2)
             with col_sliders_1:
                 # Cursore con due maniglie per l'intervallo di minutaggio
-                start_minute = st.slider("Minuto di Riferimento", 0, 90, 45, key="minute_slider")
+                minute_range = st.slider("Intervallo di Minutaggio", 0, 90, (0, 45), key="minute_range_slider")
             with col_sliders_2:
                 starting_score_str = st.text_input("Risultato di Partenza (es. 1-0)", "0-0", key="score_input")
             
             # Validazione e parsing del risultato di partenza
             try:
                 if "-" in starting_score_str:
+                    end_minute = minute_range[1]
                     # FILTRAGGIO CRITICO: trova le partite che avevano il punteggio desiderato al minuto specificato
                     df_dynamic_filtered = df_combined[df_combined.apply(
-                        lambda row: get_scores_at_minute(row, start_minute, home_team_selected, away_team_selected) == starting_score_str,
+                        lambda row: get_scores_at_minute(row, end_minute, home_team_selected, away_team_selected) == starting_score_str,
                         axis=1
                     )]
                     # Per la Clean Sheets, suddivido il dataframe filtrato
@@ -678,7 +680,7 @@ if selected_league != "Seleziona...":
                 df_dynamic_away = pd.DataFrame()
             
             if not df_dynamic_filtered.empty:
-                st.write(f"Analisi basata su **{len(df_dynamic_filtered)}** partite in cui il punteggio era **{starting_score_str}** al minuto **{start_minute}**.")
+                st.write(f"Analisi basata su **{len(df_dynamic_filtered)}** partite in cui il punteggio era **{starting_score_str}** al minuto **{end_minute}**.")
                 
                 # Prova visiva che la logica è corretta
                 with st.expander("Visualizzazione Partite Filtrate"):
@@ -701,14 +703,14 @@ if selected_league != "Seleziona...":
                 calcola_over_goals(df_dynamic_filtered, "gol_home_ht", "gol_away_ht", "PT")
                 calcola_btts(df_dynamic_filtered, "gol_home_ht", "gol_away_ht", "PT")
                 calcola_clean_sheets(df_dynamic_home, df_dynamic_away, home_team_selected, away_team_selected, "gol_home_ht", "gol_away_ht", "PT")
-                calcola_first_to_score(df_dynamic_filtered, home_team_selected, away_team_selected, f"PT (dopo il minuto {start_minute})", start_min=1, end_min=45)
-                mostra_distribuzione_timeband(df_dynamic_filtered, f"PT (dopo il minuto {start_minute})", home_team_selected, away_team_selected, timeframe=5, start_minute=start_minute + 1, end_minute=45)
+                calcola_first_to_score(df_dynamic_filtered, home_team_selected, away_team_selected, f"PT (dopo il minuto {end_minute})", start_min=1, end_min=45)
+                mostra_distribuzione_timeband(df_dynamic_filtered, f"PT (dopo il minuto {end_minute})", home_team_selected, away_team_selected, timeframe=5, start_minute=end_minute + 1, end_minute=45)
 
                 st.markdown("---")
                 st.subheader("Statistiche sui Gol del Secondo Tempo (dopo il minuto di riferimento)")
                 # Calcola dinamicamente i gol del secondo tempo per il DataFrame filtrato
                 df_dynamic_filtered["risultato_sh_dynamic"] = df_dynamic_filtered.apply(
-                    lambda row: get_sh_scores_dynamic(row, start_minute, home_team_selected, away_team_selected), axis=1)
+                    lambda row: get_sh_scores_dynamic(row, end_minute, home_team_selected, away_team_selected), axis=1)
 
                 calcola_winrate(df_dynamic_filtered, "risultato_sh_dynamic", "Secondo Tempo")
                 mostra_risultati_esatti(df_dynamic_filtered, "risultato_sh_dynamic", "Secondo Tempo")
@@ -723,17 +725,17 @@ if selected_league != "Seleziona...":
 
                 st.markdown("---")
                 st.subheader("Analisi Temporale Dinamica")
-                calcola_first_to_score(df_dynamic_filtered, home_team_selected, away_team_selected, f"Dopo il Minuto {start_minute}", start_min=start_minute + 1, end_min=150)
+                calcola_first_to_score(df_dynamic_filtered, home_team_selected, away_team_selected, f"Dopo il Minuto {end_minute}", start_min=end_minute + 1, end_min=150)
                 
                 # Selettore per timeframe dinamico
                 timeframe_dynamic_options = [5, 15]
                 timeframe_dynamic = st.selectbox("Seleziona l'intervallo di minutaggio per la distribuzione dei gol", timeframe_dynamic_options, key="timeframe_dynamic")
-                mostra_distribuzione_timeband(df_dynamic_filtered, f"(Dopo il Minuto {start_minute})", home_team_selected, away_team_selected, timeframe=timeframe_dynamic, start_minute=start_minute + 1, end_minute=90)
+                mostra_distribuzione_timeband(df_dynamic_filtered, f"(Dopo il Minuto {end_minute})", home_team_selected, away_team_selected, timeframe=timeframe_dynamic, start_minute=end_minute + 1, end_minute=90)
 
 
             else:
                 if starting_score_str and "-" in starting_score_str:
-                    st.warning(f"Nessuna partita trovata in cui il punteggio era {starting_score_str} al minuto {start_minute}.")
+                    st.warning(f"Nessuna partita trovata in cui il punteggio era {starting_score_str} al minuto {end_minute}.")
                 else:
                     st.info("Inserisci un risultato di partenza valido per avviare l'analisi dinamica.")
 
