@@ -366,8 +366,10 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 
                 stats.append([
                     f"{start}'-{end}'", 
-                    f"Gol Fatti/Subiti {home_team_name}", 
-                    f"Gol Fatti/Subiti {away_team_name}", 
+                    home_scored_count,
+                    home_conceded_count,
+                    away_scored_count,
+                    away_conceded_count,
                     perc_1_goal,
                     odd_min_1_goal,
                     perc_2_goals,
@@ -376,8 +378,10 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
 
             df_stats = pd.DataFrame(stats, columns=[
                 "Intervallo", 
-                f"Gol Fatti/Subiti {home_team_name}", 
-                f"Gol Fatti/Subiti {away_team_name}", 
+                f"Gol Fatti ({home_team_name})", 
+                f"Gol Subiti ({home_team_name})", 
+                f"Gol Fatti ({away_team_name})", 
+                f"Gol Subiti ({away_team_name})", 
                 "% Winrate >= 1 Gol", 
                 "Odd Minima >= 1 Gol",
                 "% Winrate >= 2 Gol",
