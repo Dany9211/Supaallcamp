@@ -367,8 +367,8 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 
                 stats.append([
                     f"{start}'-{end}'", 
-                    f"{home_scored_count} / {home_conceded_count}", 
-                    f"{away_scored_count} / {away_conceded_count}", 
+                    f"Gol Fatti/Subiti {home_team_name}", 
+                    f"Gol Fatti/Subiti {away_team_name}", 
                     perc_1_goal,
                     odd_min_1_goal,
                     perc_2_goals,
@@ -463,13 +463,23 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         filtered_df_dynamic = pd.DataFrame()
         if start_min < end_min:
             for _, row in df_combined.iterrows():
-                risultato_attuale = get_scores_at_minute(row, start_min, home_team_selected, away_team_selected)
-                if risultato_attuale == selected_start_result:
-                    row_copy = row.copy()
-                    row_copy["risultato_ft"] = row["risultato_ft"]
-                    row_copy["gol_home_ft"] = row["gol_home_ft"]
-                    row_copy["gol_away_ft"] = row["gol_away_ft"]
-                    filtered_df_dynamic = pd.concat([filtered_df_dynamic, row_copy.to_frame().T], ignore_index=True)
+                risultato_al_min_iniziale = get_scores_at_minute(row, start_min, home_team_selected, away_team_selected)
+                if risultato_al_min_iniziale == selected_start_result:
+                    try:
+                        # Otteniamo i punteggi all'inizio e alla fine dell'intervallo
+                        home_start_score, away_start_score = map(int, risultato_al_min_iniziale.split('-'))
+                        home_ft_score, away_ft_score = map(int, str(row["risultato_ft"]).split('-'))
+
+                        # Validiamo che il punteggio finale non sia inferiore a quello iniziale
+                        if home_ft_score >= home_start_score and away_ft_score >= away_start_score:
+                            row_copy = row.copy()
+                            filtered_df_dynamic = pd.concat([filtered_df_dynamic, row_copy.to_frame().T], ignore_index=True)
+                        else:
+                            st.warning(f"Dato inconsistente scartato per la partita {row['home_team']} vs {row['away_team']}: risultato iniziale {risultato_al_min_iniziale} al {start_min}° min, ma risultato finale {row['risultato_ft']}.")
+                    except (ValueError, KeyError):
+                        # Gestisci righe con dati mancanti o non validi nel risultato FT
+                        st.warning(f"Dato non valido scartato per la partita {row['home_team']} vs {row['away_team']}.")
+                        continue
 
         if not filtered_df_dynamic.empty:
             st.subheader(f"Statistiche basate su risultato {selected_start_result} al {start_min}° minuto ({len(filtered_df_dynamic)} partite)")
