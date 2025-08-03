@@ -693,6 +693,18 @@ if selected_league != "Seleziona...":
                 calcola_margine_vittoria(df_dynamic_filtered, "gol_home_ft", "gol_away_ft", "Finale")
                 
                 st.markdown("---")
+                st.subheader("Statistiche sul Risultato del Primo Tempo")
+                # Ora aggiungiamo le statistiche HT che hai richiesto
+                calcola_winrate(df_dynamic_filtered, "risultato_ht", "PT")
+                mostra_risultati_esatti(df_dynamic_filtered, "risultato_ht", "PT")
+                calcola_margine_vittoria(df_dynamic_filtered, "gol_home_ht", "gol_away_ht", "PT")
+                calcola_over_goals(df_dynamic_filtered, "gol_home_ht", "gol_away_ht", "PT")
+                calcola_btts(df_dynamic_filtered, "gol_home_ht", "gol_away_ht", "PT")
+                calcola_clean_sheets(df_dynamic_home, df_dynamic_away, home_team_selected, away_team_selected, "gol_home_ht", "gol_away_ht", "PT")
+                calcola_first_to_score(df_dynamic_filtered, home_team_selected, away_team_selected, f"PT (dopo il minuto {start_minute})", start_min=1, end_min=45)
+                mostra_distribuzione_timeband(df_dynamic_filtered, f"PT (dopo il minuto {start_minute})", home_team_selected, away_team_selected, timeframe=5, start_minute=start_minute + 1, end_minute=45)
+
+                st.markdown("---")
                 st.subheader("Statistiche sui Gol del Secondo Tempo (dopo il minuto di riferimento)")
                 # Calcola dinamicamente i gol del secondo tempo per il DataFrame filtrato
                 df_dynamic_filtered["risultato_sh_dynamic"] = df_dynamic_filtered.apply(
