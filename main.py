@@ -461,6 +461,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             return f"{home_goals_count}-{away_goals_count}"
 
         filtered_df_dynamic = pd.DataFrame()
+        inconsistent_data_found = False
         if start_min < end_min:
             for _, row in df_combined.iterrows():
                 risultato_al_min_iniziale = get_scores_at_minute(row, start_min, home_team_selected, away_team_selected)
@@ -475,6 +476,8 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                             row_copy = row.copy()
                             filtered_df_dynamic = pd.concat([filtered_df_dynamic, row_copy.to_frame().T], ignore_index=True)
                         else:
+                            # Se troviamo un'inconsistenza, lo segnaliamo ma non interrompiamo l'analisi
+                            inconsistent_data_found = True
                             st.warning(f"Dato inconsistente scartato per la partita {row['home_team']} vs {row['away_team']}: risultato iniziale {risultato_al_min_iniziale} al {start_min}° min, ma risultato finale {row['risultato_ft']}.")
                     except (ValueError, KeyError):
                         # Gestisci righe con dati mancanti o non validi nel risultato FT
