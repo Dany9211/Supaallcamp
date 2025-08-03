@@ -152,7 +152,6 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             df_stats = pd.DataFrame(stats, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"])
             st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['WinRate %']))
         
-        # --- FUNZIONE AGGIUNTA PER LA DOPPIA CHANCE ---
         def calcola_doppia_chance(df_to_analyze, col_risultato, title):
             """
             Calcola e mostra le probabilità per la doppia chance (1X, 12, X2).
@@ -389,41 +388,45 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
             for start, end in time_bands:
                 
-                home_scored_count = 0
-                home_conceded_count = 0
-                away_scored_count = 0
-                away_conceded_count = 0
+                # Statistiche per la squadra selezionata in casa
+                home_scored_home_count = 0
+                home_conceded_home_count = 0
+                
+                for _, row in df_home.iterrows():
+                    home_goals_minutes_str = str(row.get("minutaggio_gol", ""))
+                    away_goals_minutes_str = str(row.get("minutaggio_gol_away", ""))
+
+                    home_goals_in_band = [int(x) for x in home_goals_minutes_str.split(";") if x.isdigit() and start <= int(x) <= end]
+                    away_goals_in_band = [int(x) for x in away_goals_minutes_str.split(";") if x.isdigit() and start <= int(x) <= end]
+                    
+                    home_scored_home_count += len(home_goals_in_band)
+                    home_conceded_home_count += len(away_goals_in_band)
+                
+                # Statistiche per la squadra selezionata in trasferta
+                away_scored_away_count = 0
+                away_conceded_away_count = 0
+                
+                for _, row in df_away.iterrows():
+                    home_goals_minutes_str = str(row.get("minutaggio_gol", ""))
+                    away_goals_minutes_str = str(row.get("minutaggio_gol_away", ""))
+                    
+                    home_goals_in_band = [int(x) for x in home_goals_minutes_str.split(";") if x.isdigit() and start <= int(x) <= end]
+                    away_goals_in_band = [int(x) for x in away_goals_minutes_str.split(";") if x.isdigit() and start <= int(x) <= end]
+                    
+                    away_scored_away_count += len(away_goals_in_band)
+                    away_conceded_away_count += len(home_goals_in_band)
+                
+                # Statistiche totali per la banda temporale
                 matches_at_least_1_goal = 0
                 matches_at_least_2_goals = 0
                 
                 for _, row in df_to_analyze.iterrows():
+                    home_goals_minutes_str = str(row.get("minutaggio_gol", ""))
+                    away_goals_minutes_str = str(row.get("minutaggio_gol_away", ""))
+                    home_goals_in_match = [int(x) for x in home_goals_minutes_str.split(";") if x.isdigit()]
+                    away_goals_in_match = [int(x) for x in away_goals_minutes_str.split(";") if x.isdigit()]
+                    total_goals_in_band = len([g for g in home_goals_in_match + away_goals_in_match if start <= g <= end])
                     
-                    # Estrae i minuti dei gol, gestendo i valori NaN e stringhe vuote
-                    home_goal_minutes_str = str(row.get("minutaggio_gol", ""))
-                    away_goal_minutes_str = str(row.get("minutaggio_gol_away", ""))
-
-                    home_goals_in_match = [int(x) for x in home_goal_minutes_str.split(";") if x.isdigit()]
-                    away_goals_in_match = [int(x) for x in away_goal_minutes_str.split(";") if x.isdigit()]
-                    
-                    # Logica corretta per l'inclusività del minuto finale
-                    # La condizione `start <= g <= end` è ora usata per tutti gli intervalli.
-                    goals_by_home_team_in_band = [g for g in home_goals_in_match if start <= g <= end]
-                    goals_by_away_team_in_band = [g for g in away_goals_in_match if start <= g <= end]
-                    
-                    # Calcola i gol fatti e subiti in base alla squadra selezionata
-                    if row["home_team"] == home_team_name:
-                        home_scored_count += len(goals_by_home_team_in_band)
-                        home_conceded_count += len(goals_by_away_team_in_band)
-                        away_scored_count += len(goals_by_away_team_in_band)
-                        away_conceded_count += len(goals_by_home_team_in_band)
-                    else: # Squadra selezionata gioca fuori casa
-                        home_scored_count += len(goals_by_away_team_in_band)
-                        home_conceded_count += len(goals_by_home_team_in_band)
-                        away_scored_count += len(goals_by_home_team_in_band)
-                        away_conceded_count += len(goals_by_away_team_in_band)
-                        
-                    # Calcola le metriche di gol totali per la banda temporale
-                    total_goals_in_band = len(goals_by_home_team_in_band) + len(goals_by_away_team_in_band)
                     if total_goals_in_band >= 1:
                         matches_at_least_1_goal += 1
                     if total_goals_in_band >= 2:
@@ -440,10 +443,10 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 
                 stats.append([
                     f"{start}'-{end}'", 
-                    home_scored_count,
-                    home_conceded_count,
-                    away_scored_count,
-                    away_conceded_count,
+                    home_scored_home_count,
+                    home_conceded_home_count,
+                    away_scored_away_count,
+                    away_conceded_away_count,
                     perc_1_goal,
                     odd_min_1_goal,
                     perc_2_goals,
