@@ -316,9 +316,20 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         with col2_dyn:
             start_min, end_min = st.slider(
                 'Seleziona intervallo di tempo (minuti)',
-                0, 150, (45, 90)
+                0, 90, (45, 90)
             )
         st.markdown("---")
+
+        # Visualizza le statistiche del Primo Tempo se il cursore di inizio è prima del 46° minuto
+        if start_min < 46:
+            st.subheader("Statistiche HT (Generali)")
+            if not df_combined.empty:
+                calcola_winrate(df_combined, "risultato_ht", "HT")
+                mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
+                calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
+                calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", "HT")
+            else:
+                st.warning("Nessuna partita trovata per le statistiche del Primo Tempo.")
 
 
         # --- FUNZIONE DI SUPPORTO PER CALCOLARE I GOL AL MINUTO X ---
