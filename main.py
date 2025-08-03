@@ -43,6 +43,7 @@ if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
 
+# Correzione: rimosso il 'col' duplicato nel ciclo for.
 if all(col in df.columns for col in ["gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht"]):
     df["gol_home_sh"] = pd.to_numeric(df["gol_home_ft"], errors='coerce').fillna(0) - pd.to_numeric(df["gol_home_ht"], errors='coerce').fillna(0)
     df["gol_away_sh"] = pd.to_numeric(df["gol_away_ft"], errors='coerce').fillna(0) - pd.to_numeric(df["gol_away_ht"], errors='coerce').fillna(0)
@@ -350,6 +351,58 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
             df_stats = pd.DataFrame(stats, columns=["Squadra", "Conteggio", "Probabilità %", "Odd Minima"])
             st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['Probabilità %']))
+        
+        def calcola_timeband_stats(df_combined_dynamic, time_bands, title, home_team_name, away_team_name):
+            """Calcola le probabilità del prossimo gol per bande temporali."""
+            st.subheader(f"Statistiche per {title}")
+            for start, end in time_bands:
+                st.write(f"**Banda temporale: {start}' - {end}'**")
+                first_goal_stats = defaultdict(int)
+                total_matches = len(df_combined_dynamic)
+                
+                # Filtra le partite in cui un gol è stato segnato nella banda temporale
+                valid_matches = 0
+                for _, row in df_combined_dynamic.iterrows():
+                    home_goals_in_band = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit() and start <= int(x) <= end]
+                    away_goals_in_band = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit() and start <= int(x) <= end]
+                    
+                    if home_goals_in_band or away_goals_in_band:
+                        valid_matches += 1
+                        first_goal_in_band_home = min(home_goals_in_band, default=float('inf'))
+                        first_goal_in_band_away = min(away_goals_in_band, default=float('inf'))
+                        
+                        if first_goal_in_band_home < first_goal_in_band_away:
+                            if row["home_team"] == home_team_name:
+                                first_goal_stats[home_team_name] += 1
+                            else:
+                                first_goal_stats[away_team_name] += 1
+                        elif first_goal_in_band_away < first_goal_in_band_home:
+                            if row["away_team"] == away_team_name:
+                                first_goal_stats[away_team_name] += 1
+                            else:
+                                first_goal_stats[home_team_name] += 1
+                
+                # Calcola le percentuali e le quote
+                stats = []
+                total_goals = sum(first_goal_stats.values())
+                for team, count in first_goal_stats.items():
+                    perc = round((count / total_goals) * 100, 2) if total_goals > 0 else 0
+                    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                    stats.append((team, count, perc, odd_min))
+                
+                # Se non ci sono gol nella banda, aggiungi una riga
+                if total_goals == 0:
+                    stats.append(("Nessun Gol nel Periodo", 0, 0, "-"))
+
+                # Calcola la probabilità di un gol totale nella banda
+                perc_gol_nella_banda = round((valid_matches / total_matches) * 100, 2) if total_matches > 0 else 0
+                odd_gol_nella_banda = round(100 / perc_gol_nella_banda, 2) if perc_gol_nella_banda > 0 else "-"
+
+                # Aggiungi la riga per la probabilità totale
+                stats.append(("Probabilità Gol nella banda", valid_matches, perc_gol_nella_banda, odd_gol_nella_banda))
+                
+                df_stats = pd.DataFrame(stats, columns=["Squadra", "Conteggio", "Probabilità %", "Odd Minima"])
+                st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['Probabilità %']))
 
         # --- Sezione principale delle statistiche pre-partita (statica) ---
         with st.expander("Statistiche Pre-partita (FT, HT, SH)", expanded=True):
@@ -361,11 +414,11 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 with col1:
                     calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "FT", "gol_home_ft", "gol_away_ft")
                     calcola_winrate(df_combined, "risultato_ft", "FT")
+                    calcola_doppia_chance(df_combined, home_team_selected, away_team_selected, "FT", "gol_home_ft", "gol_away_ft") # Aggiunta
                 with col2:
                     calcola_over_goals(df_combined, "gol_home_ft", "gol_away_ft", "FT")
                     calcola_btts(df_combined, "gol_home_ft", "gol_away_ft", "FT")
                 calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_ft", "gol_away_ft", "FT")
-                calcola_doppia_chance(df_combined, home_team_selected, away_team_selected, "FT", "gol_home_ft", "gol_away_ft")
                 mostra_risultati_esatti(df_combined, "risultato_ft", "FT")
 
             with tab2:
@@ -375,11 +428,11 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     with col1:
                         calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "HT", "gol_home_ht", "gol_away_ht")
                         calcola_winrate(df_combined, "risultato_ht", "HT")
+                        calcola_doppia_chance(df_combined, home_team_selected, away_team_selected, "HT", "gol_home_ht", "gol_away_ht") # Aggiunta
                     with col2:
                         calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
                         calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", "HT")
                     calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_ht", "gol_away_ht", "HT")
-                    calcola_doppia_chance(df_combined, home_team_selected, away_team_selected, "HT", "gol_home_ht", "gol_away_ht")
                     mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
                 else:
                     st.warning("Dati del Primo Tempo non disponibili.")
@@ -391,11 +444,11 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     with col1:
                         calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "SH", "gol_home_sh", "gol_away_sh")
                         calcola_winrate(df_combined, "risultato_sh", "SH")
+                        calcola_doppia_chance(df_combined, home_team_selected, away_team_selected, "SH", "gol_home_sh", "gol_away_sh") # Aggiunta
                     with col2:
                         calcola_over_goals(df_combined, "gol_home_sh", "gol_away_sh", "SH")
                         calcola_btts(df_combined, "gol_home_sh", "gol_away_sh", "SH")
                     calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_sh", "gol_away_sh", "SH")
-                    calcola_doppia_chance(df_combined, home_team_selected, away_team_selected, "SH", "gol_home_sh", "gol_away_sh")
                     mostra_risultati_esatti(df_combined, "risultato_sh", "SH")
                 else:
                     st.warning("Dati del Secondo Tempo non disponibili.")
@@ -434,8 +487,8 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
 
                 # Genera le statistiche dinamiche
                 with st.expander("Statistiche Dinamiche FT", expanded=True):
-                    calcola_doppia_chance(df_combined_dynamic, home_team_selected, away_team_selected, "Dinamica FT", "gol_home_ft", "gol_away_ft")
                     calcola_winrate(df_combined_dynamic, "risultato_ft", "Dinamica FT")
+                    calcola_doppia_chance(df_combined_dynamic, home_team_selected, away_team_selected, "Dinamica FT", "gol_home_ft", "gol_away_ft") # Aggiunta
                     calcola_over_goals(df_combined_dynamic, "gol_home_ft", "gol_away_ft", "Dinamica FT")
                     calcola_btts(df_combined_dynamic, "gol_home_ft", "gol_away_ft", "Dinamica FT")
                 
@@ -446,16 +499,13 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     dynamic_time_bands_5min_ft = [(i, i + 5) for i in range(current_minute + 1, 90, 5)]
                     if dynamic_time_bands_5min_ft:
                         st.subheader(f"Dinamica 5 min (dal {current_minute+1}')")
-                        # Ho aggiornato il titolo per riflettere il minuto di inizio corretto
-                        calcola_primo_gol_stats(df_combined_dynamic, home_team_selected, away_team_selected, "Dinamica", current_minute + 1, 90)
+                        calcola_timeband_stats(df_combined_dynamic, dynamic_time_bands_5min_ft, "Dinamica 5 min", home_team_selected, away_team_selected)
                     
                     dynamic_time_bands_15min_ft = [(i, i + 15) for i in range(current_minute + 1, 90, 15)]
                     if dynamic_time_bands_15min_ft:
                         st.subheader(f"Dinamica 15 min (dal {current_minute+1}')")
-                        # Ho aggiornato il titolo per riflettere il minuto di inizio corretto
-                        calcola_primo_gol_stats(df_combined_dynamic, home_team_selected, away_team_selected, "Dinamica", current_minute + 1, 90)
+                        calcola_timeband_stats(df_combined_dynamic, dynamic_time_bands_15min_ft, "Dinamica 15 min", home_team_selected, away_team_selected)
             else:
                 st.warning("Nessuna partita storica trovata con i parametri dinamici specificati. Prova a modificare minuto e punteggio.")
     else:
         st.warning("Seleziona una squadra 'CASA' e una 'TRASFERTA' per iniziare l'analisi.")
-
