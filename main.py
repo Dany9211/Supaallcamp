@@ -759,18 +759,16 @@ if selected_league != "Seleziona...":
             # --- ESECUZIONE E VISUALIZZAZIONE STATS PER INTERVALLO SPECIFICO ---
             st.markdown("---")
             st.header("Analisi per Intervallo Specifico")
-            st.subheader("Analisi dei gol segnati solo in un intervallo di minuti personalizzato")
+            st.subheader(f"Statistiche basate sui gol segnati tra il minuto **{minute_range[0]}** e il minuto **{minute_range[1]}**")
             
-            col_min_start, col_min_end = st.columns(2)
-            with col_min_start:
-                start_minute_custom = st.number_input("Minuto di inizio", min_value=1, max_value=90, value=40, key="start_minute_custom")
-            with col_min_end:
-                end_minute_custom = st.number_input("Minuto di fine", min_value=1, max_value=90, value=65, key="end_minute_custom")
+            # Non ci sono più i number_input, l'intervallo viene preso direttamente dallo slider sopra
+            start_minute_custom = minute_range[0]
+            end_minute_custom = minute_range[1]
 
             if start_minute_custom < end_minute_custom:
                 calcola_stats_intervallo_specifico(df_combined, start_minute_custom, end_minute_custom, home_team_selected, away_team_selected)
             else:
-                st.warning("Il minuto di inizio deve essere inferiore a quello di fine.")
+                st.warning("Il minuto di inizio deve essere inferiore a quello di fine per l'analisi per intervallo specifico.")
 
         else:
             st.warning("Nessuna partita trovata per la combinazione di squadre e campionato selezionata.")
