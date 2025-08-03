@@ -488,6 +488,49 @@ if selected_league != "Seleziona...":
                 ])
                 st.dataframe(df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale % (1+ Gol)']))
 
+            def calcola_next_goal(df_to_analyze, start_minute, home_team_name, away_team_name):
+                """Calcola la probabilità che la prossima squadra a segnare sia quella di casa, quella in trasferta o nessuna delle due."""
+                st.subheader(f"Prossimo Gol dopo il minuto {start_minute} ({len(df_to_analyze)} partite)")
+                if df_to_analyze.empty:
+                    st.warning("Nessuna partita analizzabile per questa statistica.")
+                    return
+
+                risultati = {f"{home_team_name}": 0, f"{away_team_name}": 0, "Nessun altro gol": 0}
+
+                for _, row in df_to_analyze.iterrows():
+                    # Identifica correttamente i gol della squadra selezionata di casa e di trasferta
+                    if row["home_team"] == home_team_name:
+                        selected_home_goals_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                        selected_away_goals_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+                    else:
+                        selected_home_goals_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+                        selected_away_goals_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+
+                    # Trova i gol segnati dopo il minuto di partenza
+                    next_home_goal_minutes = [g for g in selected_home_goals_minutes if g > start_minute]
+                    next_away_goal_minutes = [g for g in selected_away_goals_minutes if g > start_minute]
+
+                    min_next_home_goal = min(next_home_goal_minutes) if next_home_goal_minutes else float('inf')
+                    min_next_away_goal = min(next_away_goal_minutes) if next_away_goal_minutes else float('inf')
+
+                    if min_next_home_goal < min_next_away_goal:
+                        risultati[f"{home_team_name}"] += 1
+                    elif min_next_away_goal < min_next_home_goal:
+                        risultati[f"{away_team_name}"] += 1
+                    else:
+                        risultati["Nessun altro gol"] += 1
+                
+                stats = []
+                total = len(df_to_analyze)
+                for esito, count in risultati.items():
+                    perc = round((count / total) * 100, 2) if total > 0 else 0
+                    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                    stats.append((esito, count, perc, odd_min))
+                
+                df_stats = pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
+                st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+
+
 
             # --- ESECUZIONE E VISUALIZZAZIONE STATS PRE-PARTITA (FISSE) ---
             
@@ -592,7 +635,7 @@ if selected_league != "Seleziona...":
             # Validazione e parsing del risultato di partenza
             try:
                 if "-" in starting_score_str:
-                    # Filtra il DataFrame in base al minutaggio e al risultato di partenza
+                    # Filtra il DataFrame in base al minutaggio di INIZIO e al risultato di partenza
                     df_dynamic_filtered = df_combined[df_combined.apply(
                         lambda row: get_scores_at_minute(row, start_minute, home_team_selected, away_team_selected) == starting_score_str,
                         axis=1
@@ -613,6 +656,8 @@ if selected_league != "Seleziona...":
                 calcola_over_goals(df_dynamic_filtered, "gol_home_ft", "gol_away_ft", "Finale (per partite con punteggio specificato)")
                 calcola_btts(df_dynamic_filtered, "gol_home_ft", "gol_away_ft", "Finale (per partite con punteggio specificato)")
                 calcola_margine_vittoria(df_dynamic_filtered, "gol_home_ft", "gol_away_ft", "Finale (per partite con punteggio specificato)")
+                calcola_next_goal(df_dynamic_filtered, start_minute, home_team_selected, away_team_selected)
+
 
             else:
                 if starting_score_str and "-" in starting_score_str:
