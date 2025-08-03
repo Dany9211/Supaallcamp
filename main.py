@@ -205,13 +205,19 @@ if selected_league != "Seleziona...":
                 if df_to_analyze.empty: return
                 
                 if timeframe == 15:
-                    # 15-minute intervals as requested (0-15, 16-30, etc.)
-                    intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90), (91, 150)]
-                    label_intervalli = [f"{start}-{end}" for start, end in intervalli[:-1]] + ["90+"]
+                    # Intervalli da 15 minuti come richiesto (0-15, 16-30, etc.)
+                    intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
+                    label_intervalli = [f"{start}-{end}" for start, end in intervalli]
                 else:
-                    # 5-minute intervals as requested (0-5, 6-10, etc.)
-                    intervalli = [(i, i + timeframe - 1) for i in range(0, 90, timeframe)] + [(90, 150)]
-                    label_intervalli = [f"{start}-{end}" for start, end in intervalli[:-1]] + ["90+"]
+                    # Intervalli da 5 minuti come richiesto (0-5, 6-10, etc.)
+                    start_mins = [0] + [i + 1 for i in range(5, 90, 5)]
+                    end_mins = list(range(5, 91, 5))
+                    intervalli = list(zip(start_mins, end_mins))
+                    label_intervalli = [f"{start}-{end}" for start, end in intervalli]
+
+                # Aggiungi l'intervallo 90+
+                intervalli.append((91, 150))
+                label_intervalli.append("90+")
                 
                 risultati = []
                 totale_partite = len(df_to_analyze)
