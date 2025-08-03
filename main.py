@@ -41,8 +41,8 @@ if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
 
-# Calcolo dei gol e del risultato del Secondo Tempo (SH)
-if all(col in df.columns for col col in ["gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht"]):
+# Correzione: rimosso il 'col' duplicato nel ciclo for.
+if all(col in df.columns for col in ["gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht"]):
     df["gol_home_sh"] = pd.to_numeric(df["gol_home_ft"], errors='coerce').fillna(0) - pd.to_numeric(df["gol_home_ht"], errors='coerce').fillna(0)
     df["gol_away_sh"] = pd.to_numeric(df["gol_away_ft"], errors='coerce').fillna(0) - pd.to_numeric(df["gol_away_ht"], errors='coerce').fillna(0)
     df["risultato_sh"] = df["gol_home_sh"].astype(int).astype(str) + "-" + df["gol_away_sh"].astype(int).astype(str)
