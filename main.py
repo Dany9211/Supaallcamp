@@ -16,6 +16,7 @@ def run_query(query: str):
     La funzione è cacheata per evitare di riconnettersi al database ad ogni aggiornamento.
     """
     try:
+        # st.secrets["postgres"] contiene le credenziali del database
         conn = psycopg2.connect(**st.secrets["postgres"], sslmode="require")
         df = pd.read_sql(query, conn)
         conn.close()
@@ -121,7 +122,10 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 return 'X'
 
         def calcola_winrate(df_to_analyze, col_risultato, title):
-            """Calcola e mostra il WinRate basato sui risultati complessivi."""
+            """
+            Calcola e mostra il WinRate basato sui risultati complessivi.
+            Per l'analisi dinamica, questo si riferisce al risultato FT delle partite filtrate.
+            """
             st.subheader(f"WinRate {title} ({len(df_to_analyze)} partite)")
             df_valid = df_to_analyze[df_to_analyze[col_risultato].notna() & (df_to_analyze[col_risultato].str.contains("-"))].copy()
             
@@ -524,6 +528,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 if not filtered_df_dynamic.empty:
                     calcola_media_gol(filtered_df_dynamic_home, filtered_df_dynamic_away, home_team_selected, away_team_selected, "FT", "gol_home_ft", "gol_away_ft")
                     calcola_clean_sheets(filtered_df_dynamic_home, filtered_df_dynamic_away, home_team_selected, away_team_selected, "gol_home_ft", "gol_away_ft", "FT")
+                    # La logica seguente calcola il winrate FT solo per le partite che corrispondono ai filtri dinamici
                     calcola_winrate(filtered_df_dynamic, "risultato_ft", f"con risultato {selected_start_result} al {start_min}° min")
                     mostra_risultati_esatti(filtered_df_dynamic, "risultato_ft", f"con risultato {selected_start_result} al {start_min}° min")
                     calcola_over_goals(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", f"con risultato {selected_start_result} al {start_min}° min")
