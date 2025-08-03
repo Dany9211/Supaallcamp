@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict
 import datetime
+import json
 
 # --- Configurazione della pagina ---
 st.set_page_config(page_title="Analisi Squadre Combinate", layout="wide")
@@ -18,7 +19,8 @@ def run_query(query: str):
     La funzione è cacheata per evitare di riconnettersi al database ad ogni aggiornamento.
     """
     try:
-        conn = psycopg2.connect(**st.secrets["postgres"], sslmode="require")
+        db_config = st.secrets["postgres"]
+        conn = psycopg2.connect(**db_config, sslmode="require")
         df = pd.read_sql(query, conn)
         conn.close()
         return df
@@ -54,14 +56,22 @@ home_team_selected = st.sidebar.selectbox("Seleziona Squadra Casa", [""] + all_t
 away_team_selected = st.sidebar.selectbox("Seleziona Squadra Trasferta", [""] + all_teams)
 
 # Filtro per l'anno
-years = sorted(df["season"].unique(), reverse=True)
+if "season" in df.columns:
+    years = sorted(df["season"].unique(), reverse=True)
+else:
+    years = []
+    st.sidebar.warning("Colonna 'season' non trovata nel database. Il filtro per l'anno non è disponibile.")
 year_selected = st.sidebar.multiselect("Seleziona Anno/i", options=years, default=years)
 
 # Filtro per il campionato
-all_competitions = sorted(df["competition_name"].unique())
+if "competition_name" in df.columns:
+    all_competitions = sorted(df["competition_name"].unique())
+else:
+    all_competitions = []
+    st.sidebar.warning("Colonna 'competition_name' non trovata nel database. Il filtro per il campionato non è disponibile.")
 competition_selected = st.sidebar.multiselect("Seleziona Campionato/i", options=all_competitions, default=all_competitions)
 
-# Filtro per i risultati finali (1, X, 2) - MODIFICA RICHIESTA
+# Filtro per i risultati finali (1, X, 2)
 st.sidebar.subheader("Filtra per Risultato Finale")
 selected_results = []
 if st.sidebar.checkbox("1 (Vittoria Casa)", value=True):
@@ -71,8 +81,26 @@ if st.sidebar.checkbox("X (Pareggio)", value=True):
 if st.sidebar.checkbox("2 (Vittoria Trasferta)", value=True):
     selected_results.append("2")
 
+
+# Funzione per calcolare lo score a un minuto specifico
+def get_score_at_minute(row, target_minute):
+    """
+    Calcola il punteggio di una partita fino a un minuto specifico.
+    Si assume che le colonne `minutaggio_gol` e `minutaggio_gol_away` contengano stringhe di minuti separate da punto e virgola.
+    """
+    try:
+        home_goals_minutes_str = str(row.get("minutaggio_gol", ""))
+        away_goals_minutes_str = str(row.get("minutaggio_gol_away", ""))
+        
+        home_goals_in_match = [int(x) for x in home_goals_minutes_str.split(";") if x.isdigit() and int(x) <= target_minute]
+        away_goals_in_match = [int(x) for x in away_goals_minutes_str.split(";") if x.isdigit() and int(x) <= target_minute]
+        
+        return len(home_goals_in_match), len(away_goals_in_match)
+    except (ValueError, AttributeError):
+        return 0, 0
+
 # --- Funzioni di calcolo delle statistiche ---
-def calcola_stats_statiche(df_filtered, df_totale, team_name, team_type):
+def calcola_stats_statiche(df_filtered, team_name, team_type):
     """
     Calcola e visualizza le statistiche statiche per una squadra.
     """
@@ -136,39 +164,43 @@ def calcola_timeband_stats(df_filtered, time_bands, analisi_type, home_team, awa
     """
     Calcola e visualizza le statistiche dei gol per bande temporali.
     """
-    if df_filtered.empty:
+    total_matches = len(df_filtered)
+    if total_matches == 0:
         st.info(f"Nessuna partita trovata per l'analisi {analisi_type}.")
         return
 
     st.subheader(f"Statistiche Gol per Bande Temporali ({analisi_type})")
-    
-    # Crea un DataFrame per i risultati
-    stats_df = pd.DataFrame(columns=["Banda", "Gol Fatti Casa", "Gol Subiti Casa", "Gol Fatti Trasferta", "Gol Subiti Trasferta"])
-    
-    for start_min, end_min in time_bands:
-        # Filtra gli eventi gol all'interno della banda temporale
-        gol_home_count = len(df_filtered[
-            (df_filtered["minuto_gol_home"] >= start_min) & (df_filtered["minuto_gol_home"] < end_min)
-        ])
-        gol_away_count = len(df_filtered[
-            (df_filtered["minuto_gol_away"] >= start_min) & (df_filtered["minuto_gol_away"] < end_min)
-        ])
 
-        # Aggiungi i risultati al DataFrame
-        new_row = pd.DataFrame([{
+    stats_data = []
+
+    for start_min, end_min in time_bands:
+        goals_home_in_band = 0
+        goals_away_in_band = 0
+        
+        for _, row in df_filtered.iterrows():
+            try:
+                home_goals = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                away_goals = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+            except (ValueError, AttributeError):
+                home_goals = []
+                away_goals = []
+
+            goals_home_in_band += len([g for g in home_goals if start_min <= g <= end_min])
+            goals_away_in_band += len([g for g in away_goals if start_min <= g <= end_min])
+
+        stats_data.append({
             "Banda": f"{start_min}-{end_min} min",
-            f"Gol Fatti {home_team}": gol_home_count,
-            f"Gol Subiti {away_team}": gol_home_count,
-            f"Gol Fatti {away_team}": gol_away_count,
-            f"Gol Subiti {home_team}": gol_away_count
-        }])
-        stats_df = pd.concat([stats_df, new_row], ignore_index=True)
-    
-    st.table(stats_df)
+            f"Gol Fatti {home_team}": goals_home_in_band,
+            f"Gol Fatti {away_team}": goals_away_in_band,
+        })
+        
+    stats_df = pd.DataFrame(stats_data)
+    st.dataframe(stats_df)
 
 # --- Logica principale dell'applicazione ---
 if home_team_selected and away_team_selected:
     # Filtra il DataFrame iniziale in base alle squadre e ai filtri selezionati
+    # Filtro statico
     filtered_df_static = df[
         (df["home_team"] == home_team_selected) &
         (df["away_team"] == away_team_selected) &
@@ -190,20 +222,27 @@ if home_team_selected and away_team_selected:
     st.header(f"Analisi Dinamica: {home_team_selected} vs {away_team_selected}")
     
     # Sliders per i filtri dinamici
-    gol_home_dynamic = st.sidebar.slider(f"Gol attuali {home_team_selected}", 0, 10, 0)
-    gol_away_dynamic = st.sidebar.slider(f"Gol attuali {away_team_selected}", 0, 10, 0)
-    start_min = st.sidebar.slider("Minuto Iniziale", 0, 90, 0)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        gol_home_dynamic = st.slider(f"Gol attuali {home_team_selected}", 0, 10, 0)
+    with col2:
+        gol_away_dynamic = st.slider(f"Gol attuali {away_team_selected}", 0, 10, 0)
+    with col3:
+        start_min = st.slider("Minuto Iniziale", 0, 90, 0)
 
-    # Filtra il DataFrame in base allo stato attuale della partita
-    filtered_df_dynamic = df[
-        (df["home_team"] == home_team_selected) &
-        (df["away_team"] == away_team_selected) &
-        (df["gol_home_ft"] > gol_home_dynamic) &
-        (df["gol_away_ft"] > gol_away_dynamic) &
-        (df["season"].isin(year_selected)) &
-        (df["competition_name"].isin(competition_selected)) &
-        (df["risultato_ft"].isin(selected_results))
-    ].copy()
+    # Filtra il DataFrame in base allo stato attuale della partita al minuto `start_min`
+    if "minutaggio_gol" in df.columns and "minutaggio_gol_away" in df.columns:
+        filtered_df_dynamic = df[
+            (df["home_team"] == home_team_selected) &
+            (df["away_team"] == away_team_selected) &
+            (df.apply(lambda row: get_score_at_minute(row, start_min) == (gol_home_dynamic, gol_away_dynamic), axis=1)) &
+            (df["season"].isin(year_selected)) &
+            (df["competition_name"].isin(competition_selected)) &
+            (df["risultato_ft"].isin(selected_results))
+        ].copy()
+    else:
+        filtered_df_dynamic = pd.DataFrame()
+        st.warning("Colonne 'minutaggio_gol' o 'minutaggio_gol_away' non trovate. L'analisi dinamica non è disponibile.")
 
     if not filtered_df_dynamic.empty:
         st.info(f"Analisi dinamica basata su {len(filtered_df_dynamic)} partite.")
@@ -223,7 +262,7 @@ if home_team_selected and away_team_selected:
         else:
             st.info("Nessun intervallo di 15 minuti dopo il minuto iniziale selezionato.")
     else:
-        st.warning("Nessuna partita trovata per l'analisi dinamica con i filtri selezionati.")
+        st.warning("Nessuna partita trovata per l'analisi dinamica con i filtri selezionati. Prova a modificare i filtri.")
 
 else:
     st.warning("Seleziona una squadra 'Casa' e una 'Trasferta' per iniziare l'analisi.")
