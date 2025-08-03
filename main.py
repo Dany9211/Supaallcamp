@@ -342,8 +342,8 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 
                 stats.append([
                     f"{start}'-{end}'", 
-                    f"{home_scored_count}/{home_conceded_count}", 
-                    f"{away_scored_count}/{away_conceded_count}", 
+                    f"Gol Fatti/Subiti {home_team_name}", 
+                    f"Gol Fatti/Subiti {away_team_name}", 
                     perc_1_goal,
                     odd_min_1_goal,
                     perc_2_goals,
@@ -362,7 +362,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=[
                 '% Winrate >= 1 Gol', '% Winrate >= 2 Gol'
             ]))
-            
+        
         # --- SEZIONE ANALISI PRE-PARTITA ---
         st.header("Analisi Pre-Partita")
         st.markdown("---")
@@ -383,7 +383,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_over_goals(df_combined, "gol_home_ft", "gol_away_ft", "FT")
                 calcola_btts(df_combined, "gol_home_ft", "gol_away_ft", "FT")
         
-        # --- Sezione per le time bands pre-partita (5 e 15 min) - REINSERITA ---
+        # --- Sezione per le time bands pre-partita (5 e 15 min) ---
         with st.expander("Analisi per Bande Temporali (Pre-Partita)", expanded=True):
             if not df_combined.empty:
                 st.subheader("Bande temporali ogni 5 minuti (0-90)")
@@ -406,9 +406,9 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             selected_start_result = st.selectbox("Risultato di Partenza", all_partial_results)
         
         with col2_dyn:
-            start_min = st.slider(
-                'Seleziona il minuto di analisi',
-                0, 90, 80
+            start_min, end_min = st.slider(
+                'Seleziona l\'intervallo di analisi',
+                0, 90, (75, 90)
             )
         
         st.markdown("---")
@@ -437,8 +437,36 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             if risultato_attuale == selected_start_result:
                 filtered_df_dynamic = pd.concat([filtered_df_dynamic, row.to_frame().T], ignore_index=True)
 
-
         if not filtered_df_dynamic.empty:
+            
+            st.subheader(f"Statistiche nel Range {start_min}-{end_min} per le partite filtrate ({len(filtered_df_dynamic)} partite)")
+            
+            # --- Nuovo calcolo per i gol segnati nell'intervallo dinamico ---
+            total_goals_in_band = 0
+            home_goals_in_band = 0
+            away_goals_in_band = 0
+            
+            for _, row in filtered_df_dynamic.iterrows():
+                home_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                away_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+                
+                # Calcola i gol segnati tra start_min e end_min
+                home_goals_in_interval = sum(1 for g in home_goal_minutes if start_min <= g < end_min)
+                away_goals_in_interval = sum(1 for g in away_goal_minutes if start_min <= g < end_min)
+
+                if row["home_team"] == home_team_selected:
+                    home_goals_in_band += home_goals_in_interval
+                    away_goals_in_band += away_goals_in_interval
+                else: # La squadra selezionata è quella in trasferta
+                    home_goals_in_band += away_goals_in_interval
+                    away_goals_in_band += home_goals_in_interval
+
+                total_goals_in_band += home_goals_in_interval + away_goals_in_interval
+
+            st.write(f"In **{len(filtered_df_dynamic)}** partite, che al **{start_min}° minuto** avevano un risultato di **{selected_start_result}**, sono stati segnati **{total_goals_in_band}** gol totali nell'intervallo **{start_min}-{end_min}**.")
+            st.write(f"In questo intervallo, la squadra di casa ({home_team_selected}) ha segnato **{home_goals_in_band}** gol e la squadra in trasferta ({away_team_selected}) ha segnato **{away_goals_in_band}** gol.")
+            st.markdown("---")
+            
             st.subheader(f"Statistiche di RISULTATO FINALE (FT) per le partite filtrate ({len(filtered_df_dynamic)} partite)")
             st.write(f"Queste partite avevano un risultato di **{selected_start_result}** al **{start_min}° minuto**.")
             st.markdown("---")
