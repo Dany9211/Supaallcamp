@@ -33,12 +33,24 @@ except Exception as e:
     st.error(f"Errore durante il caricamento del database: {e}")
     st.stop()
 
-# --- Aggiunta colonne calcolate ---
+# --- Aggiunta colonne calcolate e controllo esistenza colonna 'data' ---
 if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
     df["risultato_ft"] = df["gol_home_ft"].astype(str) + "-" + df["gol_away_ft"].astype(str)
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
-df["date"] = pd.to_datetime(df["date"], errors='coerce')
+
+# Controllo se la colonna 'data' o 'date' esiste prima di usarla
+date_col_name = None
+if "data" in df.columns:
+    date_col_name = "data"
+elif "date" in df.columns:
+    date_col_name = "date"
+
+has_date_column = date_col_name is not None
+if has_date_column:
+    df[date_col_name] = pd.to_datetime(df[date_col_name], errors='coerce')
+else:
+    st.sidebar.warning("Le colonne 'data' o 'date' non sono presenti nel database. Il filtro per le ultime N partite non sarà disponibile.")
 
 
 # --- Selettori Sidebar ---
@@ -59,15 +71,16 @@ if selected_league != "Seleziona...":
 
     if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona...":
         
-        # --- Aggiunto selettore per le ultime N partite ---
-        st.sidebar.header("Filtra Partite per Numero")
-        num_partite_options = ["Tutte", "Ultime 5", "Ultime 10", "Ultime 15", "Ultime 20", "Ultime 30", "Ultime 40", "Ultime 50"]
-        selected_num_partite_str = st.sidebar.selectbox("Numero di partite da analizzare", num_partite_options)
-        
-        # Converti la selezione in un numero intero
+        # --- Selettore per le ultime N partite, mostrato solo se la colonna 'data' o 'date' esiste ---
         num_to_filter = None
-        if selected_num_partite_str != "Tutte":
-            num_to_filter = int(selected_num_partite_str.split(' ')[1])
+        if has_date_column:
+            st.sidebar.header("Filtra Partite per Numero")
+            num_partite_options = ["Tutte", "Ultime 5", "Ultime 10", "Ultime 15", "Ultime 20", "Ultime 30", "Ultime 40", "Ultime 50"]
+            selected_num_partite_str = st.sidebar.selectbox("Numero di partite da analizzare", num_partite_options)
+            
+            # Converti la selezione in un numero intero
+            if selected_num_partite_str != "Tutte":
+                num_to_filter = int(selected_num_partite_str.split(' ')[1])
 
         # --- FILTRAGGIO E COMBINAZIONE DATI ---
         
@@ -77,9 +90,10 @@ if selected_league != "Seleziona...":
         # Prendi tutte le partite in trasferta della squadra in trasferta
         df_away = df[(df["away_team"] == away_team_selected) & (df["league"] == selected_league)]
         
-        # Ordina per data decrescente e filtra per il numero di partite
-        df_home = df_home.sort_values(by="date", ascending=False)
-        df_away = df_away.sort_values(by="date", ascending=False)
+        # Ordina per data decrescente e filtra per il numero di partite, solo se la colonna esiste
+        if has_date_column:
+            df_home = df_home.sort_values(by=date_col_name, ascending=False)
+            df_away = df_away.sort_values(by=date_col_name, ascending=False)
 
         if num_to_filter is not None:
             df_home = df_home.head(num_to_filter)
