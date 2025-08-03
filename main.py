@@ -269,7 +269,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
         def calcola_primo_gol_stats(df_combined, home_team_name, away_team_name, title, start_minute, end_minute):
             """Calcola le probabilità di chi segna il primo gol della partita/periodo in un intervallo di tempo."""
-            st.subheader(f"Chi segna il primo gol? {title} ({len(df_combined)} partite)")
+            st.subheader(f"Chi segna il prossimo gol? {title} ({len(df_combined)} partite)")
             
             first_goal_stats = defaultdict(int)
             total_matches = len(df_combined)
@@ -437,6 +437,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "HT", "gol_home_ht", "gol_away_ht")
                 calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_ht", "gol_away_ht", "HT")
                 calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "HT", 0, 45)
+                calcola_last_to_score(df_combined, 0, 45, home_team_selected, away_team_selected) # Aggiunto per l'HT
                 calcola_winrate(df_combined, "risultato_ht", "HT")
                 mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
                 calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
@@ -447,6 +448,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "SH", "gol_home_sh", "gol_away_sh")
                 calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_sh", "gol_away_sh", "SH")
                 calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "SH", 46, 90)
+                calcola_last_to_score(df_combined, 46, 90, home_team_selected, away_team_selected)
                 calcola_winrate(df_combined, "risultato_sh", "SH")
                 mostra_risultati_esatti(df_combined, "risultato_sh", "SH")
                 calcola_over_goals(df_combined, "gol_home_sh", "gol_away_sh", "SH")
@@ -457,6 +459,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "FT", "gol_home_ft", "gol_away_ft")
                 calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_ft", "gol_away_ft", "FT")
                 calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "FT", 0, 90)
+                calcola_last_to_score(df_combined, 0, 90, home_team_selected, away_team_selected)
                 calcola_winrate(df_combined, "risultato_ft", "FT")
                 mostra_risultati_esatti(df_combined, "risultato_ft", "FT")
                 calcola_over_goals(df_combined, "gol_home_ft", "gol_away_ft", "FT")
@@ -516,7 +519,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     calcola_winrate(df_combined_dynamic, "risultato_ft", f"FT (dopo {current_minute_dynamic}')")
                     calcola_btts(df_combined_dynamic, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic}')")
                     calcola_primo_gol_stats(df_combined_dynamic, home_team_selected, away_team_selected, f"Prossimo gol (dopo {current_minute_dynamic}')", current_minute_dynamic + 1, 90)
-                    calcola_last_to_score(df_combined_dynamic, current_minute_dynamic, 90, home_team_selected, away_team_selected)
+                    calcola_last_to_score(df_combined_dynamic, current_minute_dynamic + 1, 90, home_team_selected, away_team_selected)
                 
                 with st.expander("Bande Temporali Dinamiche", expanded=False):
                     dynamic_time_bands_5min = [(i, i + 5) for i in range(current_minute_dynamic, 90, 5)]
