@@ -304,20 +304,22 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         # --- SEZIONE ANALISI DINAMICA IN-MATCH ---
         st.header("Analisi Dinamica In-Match")
         st.markdown("---")
-
-        st.sidebar.header("Filtri Dinamici per Analisi")
-        col1_sb, col2_sb = st.sidebar.columns(2)
-
-        with col1_sb:
+        
+        # Filtri dinamici spostati qui come richiesto dall'utente
+        st.subheader("Filtri Dinamici")
+        col1_dyn, col2_dyn = st.columns(2)
+        with col1_dyn:
             # Seleziona tutti i possibili risultati parziali per l'input utente
             all_partial_results = [f"{h}-{a}" for h in range(10) for a in range(10)]
             selected_start_result = st.selectbox("Risultato di Partenza", all_partial_results)
         
-        with col2_sb:
+        with col2_dyn:
             start_min, end_min = st.slider(
                 'Seleziona intervallo di tempo (minuti)',
                 0, 150, (45, 90)
             )
+        st.markdown("---")
+
 
         # --- FUNZIONE DI SUPPORTO PER CALCOLARE I GOL AL MINUTO X ---
         def get_scores_at_minute(df_row, selected_min, home_team_name, away_team_name):
