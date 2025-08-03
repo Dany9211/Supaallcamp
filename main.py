@@ -1,8 +1,8 @@
-Certamente. Ho integrato il codice per la funzione "doppia chance" direttamente nel tuo script, inserendola in tutte le sezioni pertinenti (pre-partita e dinamiche) senza cancellare nulla del codice esistente.
+Certamente. Mi scuso per l'errore. La risposta precedente ha incluso del testo di conversazione all'inizio, che ha causato un errore di sintassi quando il file è stato eseguito.
 
-Qui sotto trovi il tuo codice aggiornato con le modifiche.
+Ti fornirò un'unica risposta che contiene solo il codice Python corretto e completo, con la funzione `calcola_doppia_chance` e le relative chiamate già inserite nelle sezioni pre-partita e dinamiche.
 
-### Codice Aggiornato
+Ecco il codice aggiornato, pronto per essere copiato e utilizzato:
 
 ```python
 import streamlit as st
