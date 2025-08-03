@@ -1,3 +1,10 @@
+Certamente. Ho integrato il codice per la funzione "doppia chance" direttamente nel tuo script, inserendola in tutte le sezioni pertinenti (pre-partita e dinamiche) senza cancellare nulla del codice esistente.
+
+Qui sotto trovi il tuo codice aggiornato con le modifiche.
+
+### Codice Aggiornato
+
+```python
 import streamlit as st
 import psycopg2
 import pandas as pd
@@ -151,6 +158,40 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
             df_stats = pd.DataFrame(stats, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"])
             st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['WinRate %']))
+        
+        # --- FUNZIONE AGGIUNTA PER LA DOPPIA CHANCE ---
+        def calcola_doppia_chance(df_to_analyze, col_risultato, title):
+            """
+            Calcola e mostra le probabilità per la doppia chance (1X, 12, X2).
+            """
+            st.subheader(f"Doppia Chance {title} ({len(df_to_analyze)} partite)")
+            
+            df_valid = df_to_analyze[df_to_analyze[col_risultato].notna() & (df_to_analyze[col_risultato].str.contains("-"))].copy()
+            
+            risultati = {"1X": 0, "X2": 0, "12": 0}
+            
+            for ris in df_valid[col_risultato]:
+                try:
+                    home, away = map(int, ris.split("-"))
+                    outcome = get_outcome(home, away)
+                    if outcome == '1' or outcome == 'X':
+                        risultati["1X"] += 1
+                    if outcome == 'X' or outcome == '2':
+                        risultati["X2"] += 1
+                    if outcome == '1' or outcome == '2':
+                        risultati["12"] += 1
+                except ValueError:
+                    continue
+            
+            total = len(df_valid)
+            stats = []
+            for esito, count in risultati.items():
+                perc = round((count / total) * 100, 2) if total > 0 else 0
+                odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                stats.append((esito, count, perc, odd_min))
+            
+            df_stats = pd.DataFrame(stats, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+            st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
 
         def mostra_risultati_esatti(df_to_analyze, col_risultato, titolo):
             """Mostra la distribuzione dei risultati esatti."""
@@ -473,6 +514,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "HT", 0, 45)
                 calcola_last_to_score(df_combined, 0, 45, home_team_selected, away_team_selected)
                 calcola_winrate(df_combined, "risultato_ht", "HT")
+                calcola_doppia_chance(df_combined, "risultato_ht", "HT") # Aggiunta
                 mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
                 calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
                 calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", "HT")
@@ -484,6 +526,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "SH", 46, 90)
                 calcola_last_to_score(df_combined, 46, 90, home_team_selected, away_team_selected)
                 calcola_winrate(df_combined, "risultato_sh", "SH")
+                calcola_doppia_chance(df_combined, "risultato_sh", "SH") # Aggiunta
                 mostra_risultati_esatti(df_combined, "risultato_sh", "SH")
                 calcola_over_goals(df_combined, "gol_home_sh", "gol_away_sh", "SH")
                 calcola_btts(df_combined, "gol_home_sh", "gol_away_sh", "SH")
@@ -495,6 +538,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "FT", 0, 90)
                 calcola_last_to_score(df_combined, 0, 90, home_team_selected, away_team_selected)
                 calcola_winrate(df_combined, "risultato_ft", "FT")
+                calcola_doppia_chance(df_combined, "risultato_ft", "FT") # Aggiunta
                 mostra_risultati_esatti(df_combined, "risultato_ft", "FT")
                 calcola_over_goals(df_combined, "gol_home_ft", "gol_away_ft", "FT")
                 calcola_btts(df_combined, "gol_home_ft", "gol_away_ft", "FT")
@@ -551,6 +595,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     # Chiamata alle funzioni statistiche con i dati filtrati
                     calcola_over_goals_dinamico(df_combined_dynamic_ht, f"HT (dopo {current_minute_dynamic_ht}')", current_minute_dynamic_ht + 1, 45)
                     calcola_winrate(df_combined_dynamic_ht, "risultato_ht", f"HT (dopo {current_minute_dynamic_ht}')")
+                    calcola_doppia_chance(df_combined_dynamic_ht, "risultato_ht", f"HT (dopo {current_minute_dynamic_ht}')") # Aggiunta
                     mostra_risultati_esatti(df_combined_dynamic_ht, "risultato_ht", f"Risultati Esatti HT (dopo {current_minute_dynamic_ht}')")
                     calcola_btts(df_combined_dynamic_ht, "gol_home_ht", "gol_away_ht", f"HT (dopo {current_minute_dynamic_ht}')")
                     calcola_primo_gol_stats(df_combined_dynamic_ht, home_team_selected, away_team_selected, f"Prossimo gol (dopo {current_minute_dynamic_ht}')", current_minute_dynamic_ht + 1, 45)
@@ -596,6 +641,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     # Chiamata alle funzioni statistiche con i dati filtrati
                     calcola_over_goals_dinamico(df_combined_dynamic_ft, f"FT (dopo {current_minute_dynamic_ft}')", current_minute_dynamic_ft + 1, 90)
                     calcola_winrate(df_combined_dynamic_ft, "risultato_ft", f"FT (dopo {current_minute_dynamic_ft}')")
+                    calcola_doppia_chance(df_combined_dynamic_ft, "risultato_ft", f"FT (dopo {current_minute_dynamic_ft}')") # Aggiunta
                     mostra_risultati_esatti(df_combined_dynamic_ft, "risultato_ft", f"Risultati Esatti FT (dopo {current_minute_dynamic_ft}')")
                     calcola_btts(df_combined_dynamic_ft, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic_ft}')")
                     calcola_primo_gol_stats(df_combined_dynamic_ft, home_team_selected, away_team_selected, f"Prossimo gol (dopo {current_minute_dynamic_ft}')", current_minute_dynamic_ft + 1, 90)
@@ -618,3 +664,5 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         st.warning("Seleziona una squadra 'CASA' e una 'TRASFERTA' per avviare l'analisi.")
 else:
     st.info("Seleziona un campionato e due squadre per iniziare.")
+
+```
