@@ -35,577 +35,130 @@ except Exception as e:
 
 # --- Aggiunta di colonne calcolate per facilitare le analisi ---
 if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
-    df["risultato_ft"] = df["gol_home_ft"].astype(str) + "-" + df["gol_away_ft"].astype(str)
-if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
-    df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
+    df["risultato_ft"] = df["gol_home_ft"].astype(str) + " - " + df["gol_away_ft"].astype(str)
 
-# Calcolo dei gol e del risultato del Secondo Tempo (SH)
-if all(col in df.columns for col in ["gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht"]):
-    df["gol_home_sh"] = pd.to_numeric(df["gol_home_ft"], errors='coerce').fillna(0) - pd.to_numeric(df["gol_home_ht"], errors='coerce').fillna(0)
-    df["gol_away_sh"] = pd.to_numeric(df["gol_away_ft"], errors='coerce').fillna(0) - pd.to_numeric(df["gol_away_ht"], errors='coerce').fillna(0)
-    df["risultato_sh"] = df["gol_home_sh"].astype(int).astype(str) + "-" + df["gol_away_sh"].astype(int).astype(str)
-else:
-    st.sidebar.warning("Colonne mancanti per il calcolo delle statistiche del Secondo Tempo.")
+# --- Funzioni di calcolo ---
+def calcola_stats_dinamico(df_filtered, starting_score_str, end_minute):
+    """
+    Calcola e visualizza le statistiche dinamiche per i gol successivi.
+    """
+    if starting_score_str and "-" in starting_score_str:
+        home_score_start, away_score_start = map(int, starting_score_str.split(" - "))
 
-# Identifica la colonna della data per il filtro delle ultime N partite
-date_col_name = "data" if "data" in df.columns else "date" if "date" in df.columns else None
-has_date_column = date_col_name is not None
-if has_date_column:
-    df[date_col_name] = pd.to_datetime(df[date_col_name], errors='coerce')
-else:
-    st.sidebar.warning("Le colonne 'data' o 'date' non sono presenti. Il filtro per le ultime N partite non sarà disponibile.")
+        df_filtered_score = df_filtered[
+            (df_filtered[f"gol_home_{end_minute}"] == home_score_start) &
+            (df_filtered[f"gol_away_{end_minute}"] == away_score_start)
+        ].copy()
+
+        if not df_filtered_score.empty:
+            total_matches_with_score = len(df_filtered_score)
+            
+            # Calcolo dei gol successivi in base al risultato di partenza
+            df_filtered_score["gol_home_dopo_minuto"] = df_filtered_score["gol_home_ft"] - home_score_start
+            df_filtered_score["gol_away_dopo_minuto"] = df_filtered_score["gol_away_ft"] - away_score_start
+
+            matches_with_next_goal = df_filtered_score[
+                (df_filtered_score["gol_home_dopo_minuto"] > 0) | 
+                (df_filtered_score["gol_away_dopo_minuto"] > 0)
+            ]
+            
+            matches_with_next_goal_home = df_filtered_score[df_filtered_score["gol_home_dopo_minuto"] > 0]
+            matches_with_next_goal_away = df_filtered_score[df_filtered_score["gol_away_dopo_minuto"] > 0]
+
+            perc_next_goal = (len(matches_with_next_goal) / total_matches_with_score) * 100 if total_matches_with_score > 0 else 0
+            perc_next_goal_home = (len(matches_with_next_goal_home) / total_matches_with_score) * 100 if total_matches_with_score > 0 else 0
+            perc_next_goal_away = (len(matches_with_next_goal_away) / total_matches_with_score) * 100 if total_matches_with_score > 0 else 0
+
+            st.markdown(f"**Risultati per {total_matches_with_score} partite con punteggio di {starting_score_str} al minuto {end_minute}**")
+            
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Prossimo gol in Home", f"{perc_next_goal_home:.2f}%")
+            col2.metric("Prossimo gol in Away", f"{perc_next_goal_away:.2f}%")
+            col3.metric("Prossimo gol totale", f"{perc_next_goal:.2f}%")
+            
+        else:
+            st.warning(f"Nessuna partita trovata in cui il punteggio era {starting_score_str} al minuto {end_minute}.")
+    else:
+        st.info("Inserisci un risultato di partenza valido per avviare l'analisi dinamica.")
 
 
-# --- Selettori nella Sidebar per la configurazione dell'analisi ---
-st.sidebar.header("Seleziona Squadre")
-
-# 1. Selettore Campionato
-leagues = ["Seleziona..."] + sorted(df["league"].dropna().unique())
-selected_league = st.sidebar.selectbox("Seleziona Campionato", leagues)
-
-df_filtered_by_league = df if selected_league == "Seleziona..." else df[df["league"] == selected_league]
-all_teams = sorted(list(set(df_filtered_by_league['home_team'].dropna().unique()) | set(df_filtered_by_league['away_team'].dropna().unique())))
-
-# 2. Selettori Squadre
-home_team_selected = st.sidebar.selectbox("Seleziona Squadra CASA", ["Seleziona..."] + all_teams)
-away_team_selected = st.sidebar.selectbox("Seleziona Squadra TRASFERTA", ["Seleziona..."] + all_teams)
-
-if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona...":
+def calcola_stats_prematch(df, time_band_minutes):
+    """
+    Calcola e visualizza le statistiche dei gol per una specifica time band prematch.
+    """
+    total_matches = len(df)
     
-    # --- Selettore per le ultime N partite ---
-    num_to_filter = None
-    if has_date_column:
-        st.sidebar.header("Filtra Partite per Numero")
-        num_partite_options = ["Tutte", "Ultime 5", "Ultime 10", "Ultime 15", "Ultime 20", "Ultime 30", "Ultime 40", "Ultime 50"]
-        selected_num_partite_str = st.sidebar.selectbox("Numero di partite da analizzare", num_partite_options)
-        
-        if selected_num_partite_str != "Tutte":
-            num_to_filter = int(selected_num_partite_str.split(' ')[1])
-
-    # --- FILTRAGGIO E COMBINAZIONE DATI PRE-ANALISI ---
+    # Crea una lista di nomi di colonne da controllare (es. 'gol_home_1', 'gol_away_1', ecc.)
+    home_cols = [f'gol_home_{i}' for i in range(1, time_band_minutes + 1)]
+    away_cols = [f'gol_away_{i}' for i in range(1, time_band_minutes + 1)]
     
-    # Filtra le partite in casa della squadra selezionata
-    df_home = df_filtered_by_league[df_filtered_by_league["home_team"] == home_team_selected]
-    
-    # Filtra le partite in trasferta della squadra selezionata
-    df_away = df_filtered_by_league[df_filtered_by_league["away_team"] == away_team_selected]
-    
-    # Ordina per data e applica il filtro per il numero di partite
-    if has_date_column:
-        df_home = df_home.sort_values(by=date_col_name, ascending=False)
-        df_away = df_away.sort_values(by=date_col_name, ascending=False)
+    # Assumiamo che ci sia una colonna 'minuto_primo_gol'
+    # Se non è presente, si può usare un approccio più complesso
+    if 'minuto_primo_gol' in df.columns:
+        matches_with_goal = df[df['minuto_primo_gol'] <= time_band_minutes]
+    else:
+        st.warning("Colonna 'minuto_primo_gol' non trovata. Impossibile calcolare le statistiche prematch.")
+        return
 
-    if num_to_filter is not None:
-        df_home = df_home.head(num_to_filter)
-        df_away = df_away.head(num_to_filter)
-
-    # Combina i due DataFrame per le statistiche pre-partita
-    df_combined = pd.concat([df_home, df_away], ignore_index=True)
+    num_matches_with_goal = len(matches_with_goal)
+    percentage = (num_matches_with_goal / total_matches) * 100 if total_matches > 0 else 0
     
-    st.header(f"Analisi Combinata: {home_team_selected} (Casa) vs {away_team_selected} (Trasferta)")
-    st.write(f"Basata su **{len(df_home)}** partite casalinghe di '{home_team_selected}' e **{len(df_away)}** partite in trasferta di '{away_team_selected}'.")
-    st.write(f"**Totale Partite Analizzate:** {len(df_combined)}")
+    st.markdown(f"**Statistiche per la time band: 0-{time_band_minutes} minuti**")
+    col1, col2 = st.columns(2)
+    col1.metric("Numero di partite con gol", num_matches_with_goal)
+    col2.metric("Percentuale di partite con gol", f"{percentage:.2f}%")
 
+# --- UI per i filtri ---
+campioni = sorted(df["campionato"].unique())
+campionato_selezionato = st.selectbox("Seleziona un campionato", campioni)
+
+df_camp = df[df["campionato"] == campionato_selezionato]
+
+if not df_camp.empty:
+    squadre_home = sorted(df_camp["home_team"].unique())
+    squadre_away = sorted(df_camp["away_team"].unique())
+
+    col_squadre1, col_squadre2 = st.columns(2)
+    with col_squadre1:
+        home_team_selected = st.selectbox("Squadra Casa", squadre_home)
+    with col_squadre2:
+        away_team_selected = st.selectbox("Squadra Trasferta", squadre_away)
+
+    df_combined = df_camp[
+        (df_camp["home_team"] == home_team_selected) & 
+        (df_camp["away_team"] == away_team_selected)
+    ]
+    
     if not df_combined.empty:
-        
-        # --- INIZIO FUNZIONI STATISTICHE ---
-        
-        def get_outcome(home_score, away_score):
-            """Determina l'esito (1, X, 2) da un punteggio."""
-            if home_score > away_score:
-                return '1'
-            elif home_score < away_score:
-                return '2'
-            else:
-                return 'X'
+        st.write(f"**Partite trovate per {home_team_selected} vs {away_team_selected}:** {len(df_combined)}")
 
-        def calcola_winrate(df_to_analyze, col_risultato, title):
-            """Calcola e mostra il WinRate basato sui risultati complessivi."""
-            st.subheader(f"WinRate {title} ({len(df_to_analyze)} partite)")
-            df_valid = df_to_analyze[df_to_analyze[col_risultato].notna() & (df_to_analyze[col_risultato].str.contains("-"))].copy()
-            
-            risultati = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
-            for ris in df_valid[col_risultato]:
-                try:
-                    home, away = map(int, ris.split("-"))
-                    outcome = get_outcome(home, away)
-                    if outcome == '1':
-                        risultati["1 (Casa)"] += 1
-                    elif outcome == '2':
-                        risultati["2 (Trasferta)"] += 1
-                    else:
-                        risultati["X (Pareggio)"] += 1
-                except ValueError:
-                    continue
-            
-            totale = len(df_valid)
-            stats = []
-            for esito, count in risultati.items():
-                perc = round((count / totale) * 100, 2) if totale > 0 else 0
-                odd_min = round(100 / perc, 2) if perc > 0 else "-"
-                stats.append((esito, count, perc, odd_min))
-            
-            df_stats = pd.DataFrame(stats, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"])
-            st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['WinRate %']))
-
-        def mostra_risultati_esatti(df_to_analyze, col_risultato, titolo):
-            """Mostra la distribuzione dei risultati esatti."""
-            st.subheader(f"Risultati Esatti {titolo} ({len(df_to_analyze)} partite)")
-            risultati_interessanti = [
-                "0-0", "0-1", "0-2", "0-3", "1-0", "1-1", "1-2", "1-3",
-                "2-0", "2-1", "2-2", "2-3", "3-0", "3-1", "3-2", "3-3"
-            ]
-            df_valid = df_to_analyze[df_to_analyze[col_risultato].notna() & (df_to_analyze[col_risultato].str.contains("-"))].copy()
-
-            def classifica_risultato(ris):
-                if ris in risultati_interessanti: return ris
-                try:
-                    home, away = map(int, ris.split("-"))
-                    if home > away: return "Altro risultato casa vince"
-                    elif home < away: return "Altro risultato ospite vince"
-                    else: return "Altro pareggio"
-                except: return "Altro"
-
-            df_valid["classificato"] = df_valid[col_risultato].apply(classifica_risultato)
-            distribuzione = df_valid["classificato"].value_counts().reset_index()
-            distribuzione.columns = [titolo, "Conteggio"]
-            distribuzione["Percentuale %"] = (distribuzione["Conteggio"] / len(df_valid) * 100).round(2)
-            distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
-            st.dataframe(distribuzione.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-
-        def calcola_over_goals(df_to_analyze, col_gol_home, col_gol_away, title):
-            """Calcola la distribuzione Over/Under goals."""
-            st.subheader(f"Over/Under Goals {title} ({len(df_to_analyze)} partite)")
-            df_copy = df_to_analyze.copy()
-            df_copy["tot_goals"] = pd.to_numeric(df_copy[col_gol_home], errors='coerce').fillna(0) + pd.to_numeric(df_copy[col_gol_away], errors='coerce').fillna(0)
-            
-            over_data = []
-            for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
-                count = (df_copy["tot_goals"] > t).sum()
-                perc = round((count / len(df_copy)) * 100, 2)
-                odd_min = round(100 / perc, 2) if perc > 0 else "-"
-                over_data.append([f"Over {t}", count, perc, odd_min])
-            
-            df_over = pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
-            st.dataframe(df_over.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-
-        def calcola_btts(df_to_analyze, col_gol_home, col_gol_away, title):
-            """Calcola la statistica GG/NG."""
-            st.subheader(f"Entrambe le Squadre a Segno (GG/NG) {title} ({len(df_to_analyze)} partite)")
-            df_copy = df_to_analyze.copy()
-            df_copy["home_scored"] = pd.to_numeric(df_copy[col_gol_home], errors='coerce').fillna(0) > 0
-            df_copy["away_scored"] = pd.to_numeric(df_copy[col_gol_away], errors='coerce').fillna(0) > 0
-            
-            gg_count = (df_copy["home_scored"] & df_copy["away_scored"]).sum()
-            ng_count = (~(df_copy["home_scored"] & df_copy["away_scored"])).sum()
-            
-            total = len(df_copy)
-            gg_perc = round((gg_count / total) * 100, 2) if total > 0 else 0
-            ng_perc = round((ng_count / total) * 100, 2) if total > 0 else 0
-
-            data = {
-                "Esito": ["GG (Sì)", "NG (No)"],
-                "Conteggio": [gg_count, ng_count],
-                "Percentuale %": [gg_perc, ng_perc]
-            }
-            
-            df_stats = pd.DataFrame(data)
-            df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
-            st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-
-        def calcola_clean_sheets(df_home_to_analyze, df_away_to_analyze, home_team_name, away_team_name, col_gol_home, col_gol_away, title):
-            """Calcola le Clean Sheets e il Fallimento a Segnare per le squadre selezionate."""
-            st.subheader(f"Clean Sheets / Fail to Score {title} (Home: {len(df_home_to_analyze)} partite, Away: {len(df_away_to_analyze)} partite)")
-            
-            # Calcolo per la squadra di casa (in casa)
-            home_clean_sheets = (pd.to_numeric(df_home_to_analyze[col_gol_away], errors='coerce').fillna(0) == 0).sum()
-            home_fail_to_score = (pd.to_numeric(df_home_to_analyze[col_gol_home], errors='coerce').fillna(0) == 0).sum()
-            total_home_matches = len(df_home_to_analyze)
-            
-            # Calcolo per la squadra in trasferta (fuori casa)
-            away_clean_sheets = (pd.to_numeric(df_away_to_analyze[col_gol_home], errors='coerce').fillna(0) == 0).sum()
-            away_fail_to_score = (pd.to_numeric(df_away_to_analyze[col_gol_away], errors='coerce').fillna(0) == 0).sum()
-            total_away_matches = len(df_away_to_analyze)
-            
-            data = {
-                "Squadra": [home_team_name, away_team_name],
-                "Clean Sheets": [home_clean_sheets, away_clean_sheets],
-                "Fail to Score": [home_fail_to_score, away_fail_to_score]
-            }
-            
-            df_stats = pd.DataFrame(data)
-            df_stats["% Clean Sheets"] = [
-                round((home_clean_sheets / total_home_matches) * 100, 2) if total_home_matches > 0 else 0,
-                round((away_clean_sheets / total_away_matches) * 100, 2) if total_away_matches > 0 else 0
-            ]
-            df_stats["% Fail to Score"] = [
-                round((home_fail_to_score / total_home_matches) * 100, 2) if total_home_matches > 0 else 0,
-                round((away_fail_to_score / total_away_matches) * 100, 2) if total_away_matches > 0 else 0
-            ]
-            
-            st.dataframe(df_stats.style.background_gradient(cmap='Blues', subset=['% Clean Sheets']).background_gradient(cmap='Reds', subset=['% Fail to Score']))
-
-        def calcola_media_gol(df_home, df_away, home_team_name, away_team_name):
-            """Calcola la media gol fatti e subiti per le squadre selezionate."""
-            st.subheader(f"Media Gol Fatti e Subiti (Home: {len(df_home)} partite, Away: {len(df_away)} partite)")
-            
-            # Medie per il Primo Tempo (HT)
-            home_goals_ht = pd.to_numeric(df_home["gol_home_ht"], errors='coerce').mean()
-            home_conceded_ht = pd.to_numeric(df_home["gol_away_ht"], errors='coerce').mean()
-            away_goals_ht = pd.to_numeric(df_away["gol_away_ht"], errors='coerce').mean()
-            away_conceded_ht = pd.to_numeric(df_away["gol_home_ht"], errors='coerce').mean()
-            
-            # Medie per il Fine Partita (FT)
-            home_goals_ft = pd.to_numeric(df_home["gol_home_ft"], errors='coerce').mean()
-            home_conceded_ft = pd.to_numeric(df_home["gol_away_ft"], errors='coerce').mean()
-            away_goals_ft = pd.to_numeric(df_away["gol_away_ft"], errors='coerce').mean()
-            away_conceded_ft = pd.to_numeric(df_away["gol_home_ft"], errors='coerce').mean()
-
-            # Medie per il Secondo Tempo (SH)
-            home_goals_sh = pd.to_numeric(df_home["gol_home_sh"], errors='coerce').mean()
-            home_conceded_sh = pd.to_numeric(df_home["gol_away_sh"], errors='coerce').mean()
-            away_goals_sh = pd.to_numeric(df_away["gol_away_sh"], errors='coerce').mean()
-            away_conceded_sh = pd.to_numeric(df_away["gol_home_sh"], errors='coerce').mean()
-
-            data = {
-                "Squadra": [home_team_name, away_team_name],
-                "Gol Fatti (PT)": [f"{home_goals_ht:.2f}", f"{away_goals_ht:.2f}"],
-                "Gol Subiti (PT)": [f"{home_conceded_ht:.2f}", f"{away_conceded_ht:.2f}"],
-                "Gol Fatti (ST)": [f"{home_goals_sh:.2f}", f"{away_goals_sh:.2f}"],
-                "Gol Subiti (ST)": [f"{home_conceded_sh:.2f}", f"{away_conceded_sh:.2f}"],
-                "Gol Fatti (FT)": [f"{home_goals_ft:.2f}", f"{away_goals_ft:.2f}"],
-                "Gol Subiti (FT)": [f"{home_conceded_ft:.2f}", f"{away_conceded_ft:.2f}"]
-            }
-            
-            df_stats = pd.DataFrame(data)
-            st.dataframe(df_stats)
-        
-        
-        # --- SEZIONE ANALISI PRE-PARTITA ---
-        st.header("Analisi Pre-Partita")
+        # --- ESECUZIONE E VISUALIZZAZIONE STATS DINAMICHE ---
         st.markdown("---")
-
-        with st.expander("Statistiche Primo Tempo (HT)", expanded=False):
-            if not df_combined.empty:
-                calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected)
-                calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_ht", "gol_away_ht", "HT")
-                calcola_winrate(df_combined, "risultato_ht", "HT")
-                mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
-                calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
-                calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", "HT")
+        st.header("Analisi Dinamica")
+        st.subheader("Analisi del prossimo gol in base al minuto e al risultato di partenza")
         
-        with st.expander("Statistiche Fine Partita (FT)", expanded=True):
-            if not df_combined.empty:
-                calcola_winrate(df_combined, "risultato_ft", "FT")
-                mostra_risultati_esatti(df_combined, "risultato_ft", "FT")
-                calcola_over_goals(df_combined, "gol_home_ft", "gol_away_ft", "FT")
-                calcola_btts(df_combined, "gol_home_ft", "gol_away_ft", "FT")
+        col_start_min, col_start_score = st.columns(2)
+        with col_start_min:
+            end_minute = st.number_input("Minuto di analisi", min_value=1, max_value=90, value=65)
+        with col_start_score:
+            starting_score_str = st.text_input("Risultato di partenza (es. 0 - 0)", "0 - 0")
 
-
-        # --- SEZIONE ANALISI DINAMICA IN-MATCH ---
-        st.header("Analisi Dinamica In-Match")
+        calcola_stats_dinamico(df_combined, starting_score_str, end_minute)
+        
+        # --- ESECUZIONE E VISUALIZZAZIONE STATS PREMATCH ---
+        st.markdown("---")
+        st.header("Analisi Prematch")
+        st.subheader("Statistiche gol per time band (5 e 15 minuti) su tutti i match")
+        
+        # Chiamata alla funzione per la time band di 5 minuti
+        calcola_stats_prematch(df_combined, 5)
+        
         st.markdown("---")
         
-        # Filtri dinamici
-        st.subheader("Filtri Dinamici")
-        col1_dyn, col2_dyn = st.columns(2)
-        with col1_dyn:
-            # Seleziona tutti i possibili risultati parziali per l'input utente
-            all_partial_results = [f"{h}-{a}" for h in range(10) for a in range(10)]
-            selected_start_result = st.selectbox("Risultato di Partenza", all_partial_results)
-        
-        with col2_dyn:
-            start_min, end_min = st.slider(
-                'Seleziona intervallo di tempo (minuti)',
-                0, 90, (45, 90)
-            )
-        
-        st.markdown("---")
+        # Chiamata alla funzione per la time band di 15 minuti
+        calcola_stats_prematch(df_combined, 15)
 
-        # --- FUNZIONE DI SUPPORTO PER CALCOLARE I GOL AL MINUTO X ---
-        def get_scores_at_minute(df_row, selected_min, home_team_name, away_team_name):
-            """
-            Calcola il punteggio di una partita a un minuto specifico.
-            Restituisce una stringa nel formato 'gol_home-gol_away'.
-            """
-            gol_home_minutes = [int(x) for x in str(df_row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-            gol_away_minutes = [int(x) for x in str(df_row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-            
-            # Calcola i gol segnati dalla squadra di casa e da quella in trasferta selezionate
-            # fino al minuto specificato.
-            if df_row["home_team"] == home_team_name:
-                home_goals_count = sum(1 for g in gol_home_minutes if g <= selected_min)
-                away_goals_count = sum(1 for g in gol_away_minutes if g <= selected_min)
-            else:
-                home_goals_count = sum(1 for g in gol_away_minutes if g <= selected_min)
-                away_goals_count = sum(1 for g in gol_home_minutes if g <= selected_min)
-            
-            return f"{home_goals_count}-{away_goals_count}"
-        
-        # --- FUNZIONE PER ANALISI TIMEBAND AGGIORNATA ---
-        def calcola_stats_timeband(df_to_analyze, start_min, end_min, timeband_length, home_team_name, away_team_name):
-            """
-            Analizza le statistiche dei gol in timeband specifici, mostrando la percentuale
-            di partite con almeno 1 o 2 gol, e i gol fatti/subiti per squadra.
-            """
-            st.subheader(f"Analisi per Timeband di {timeband_length} minuti")
-            
-            timeband_data = []
-            
-            num_partite = len(df_to_analyze)
-            if num_partite == 0:
-                st.warning("Nessuna partita trovata per questa analisi di timeband.")
-                return
-            
-            for t_start in range(start_min, end_min, timeband_length):
-                t_end = t_start + timeband_length
-                if t_end > end_min:
-                    t_end = end_min
-                
-                # Inizializza i contatori per l'intervallo corrente
-                total_home_goals_in_interval = 0
-                total_away_goals_in_interval = 0
-                games_with_1_plus_goals = 0
-                games_with_2_plus_goals = 0
-                
-                for _, row in df_to_analyze.iterrows():
-                    all_home_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-                    all_away_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-                    
-                    if row["home_team"] == home_team_name:
-                        goals_home_selected = sum(1 for g in all_home_goal_minutes if t_start < g <= t_end)
-                        goals_away_selected = sum(1 for g in all_away_goal_minutes if t_start < g <= t_end)
-                    else:
-                        goals_home_selected = sum(1 for g in all_away_goal_minutes if t_start < g <= t_end)
-                        goals_away_selected = sum(1 for g in all_home_goal_minutes if t_start < g <= t_end)
-                    
-                    total_goals_in_interval = goals_home_selected + goals_away_selected
-                    
-                    if total_goals_in_interval >= 1:
-                        games_with_1_plus_goals += 1
-                    if total_goals_in_interval >= 2:
-                        games_with_2_plus_goals += 1
-                        
-                    total_home_goals_in_interval += goals_home_selected
-                    total_away_goals_in_interval += goals_away_selected
-
-                # La squadra di casa selezionata ha segnato 'total_home_goals_in_interval'
-                # e subito 'total_away_goals_in_interval'
-                home_goals_stats = f"Fatti: {total_home_goals_in_interval} / Subiti: {total_away_goals_in_interval}"
-                
-                # La squadra in trasferta selezionata ha segnato 'total_away_goals_in_interval'
-                # e subito 'total_home_goals_in_interval'
-                away_goals_stats = f"Fatti: {total_away_goals_in_interval} / Subiti: {total_home_goals_in_interval}"
-                
-                perc_1_plus_goals = round((games_with_1_plus_goals / num_partite) * 100, 2)
-                perc_2_plus_goals = round((games_with_2_plus_goals / num_partite) * 100, 2)
-                
-                timeband_data.append([
-                    f"{t_start}-{t_end}'",
-                    perc_1_plus_goals,
-                    perc_2_plus_goals,
-                    home_goals_stats,
-                    away_goals_stats
-                ])
-                
-            df_timeband_stats = pd.DataFrame(timeband_data, columns=[
-                "Intervallo",
-                "Almeno 1 Gol %",
-                "Almeno 2 Gol %",
-                f"Gol Fatti/Subiti ({home_team_name})",
-                f"Gol Fatti/Subiti ({away_team_name})"
-            ])
-            
-            # Applica una formattazione condizionale per evidenziare le percentuali
-            st.dataframe(
-                df_timeband_stats.style.background_gradient(
-                    cmap='RdYlGn', 
-                    subset=["Almeno 1 Gol %", "Almeno 2 Gol %"]
-                ).format(
-                    {'Almeno 1 Gol %': "{:.2f}%", 'Almeno 2 Gol %': "{:.2f}%"}
-                )
-            )
-
-        # Filtra il DataFrame combinato in base all'intervallo di tempo e al risultato di partenza
-        filtered_df_dynamic = pd.DataFrame()
-        if start_min < end_min:
-            for _, row in df_combined.iterrows():
-                # Calcolo del risultato al minuto 'start_min'
-                risultato_attuale = get_scores_at_minute(row, start_min, home_team_selected, away_team_selected)
-                if risultato_attuale == selected_start_result:
-                    # Crea un nuovo DataFrame con i risultati "dinamici" per ogni riga
-                    home_goals_at_end = sum(1 for g in [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()] if g <= end_min)
-                    away_goals_at_end = sum(1 for g in [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()] if g <= end_min)
-                    
-                    row_copy = row.copy()
-                    
-                    if row["home_team"] == home_team_selected:
-                        row_copy["gol_home_ft"] = home_goals_at_end
-                        row_copy["gol_away_ft"] = away_goals_at_end
-                    else: # Quando la squadra selezionata gioca fuori casa
-                        row_copy["gol_home_ft"] = away_goals_at_end
-                        row_copy["gol_away_ft"] = home_goals_at_end
-
-                    row_copy["risultato_ft"] = f"{int(row_copy['gol_home_ft'])}-{int(row_copy['gol_away_ft'])}"
-                    filtered_df_dynamic = pd.concat([filtered_df_dynamic, row_copy.to_frame().T], ignore_index=True)
-
-
-        if not filtered_df_dynamic.empty:
-            st.subheader(f"Statistiche basate su risultato {selected_start_result} al {start_min}° minuto")
-            # Calcolo next goal
-            risultati = {"Next Gol: Home": 0, "Next Gol: Away": 0, "Nessun prossimo gol": 0}
-            totale_partite = len(filtered_df_dynamic)
-            
-            for _, row in filtered_df_dynamic.iterrows():
-                # Calcola il primo gol segnato nell'intervallo [start_min, end_min]
-                gol_home_dinamici = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit() and start_min < int(x) <= end_min]
-                gol_away_dinamici = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit() and start_min < int(x) <= end_min]
-                
-                next_home_goal = min(gol_home_dinamici) if gol_home_dinamici else float('inf')
-                next_away_goal = min(gol_away_dinamici) if gol_away_dinamici else float('inf')
-
-                if row["home_team"] == home_team_selected:
-                    if next_home_goal < next_away_goal:
-                        risultati["Next Gol: Home"] += 1
-                    elif next_away_goal < next_home_goal:
-                        risultati["Next Gol: Away"] += 1
-                    else:
-                        if next_home_goal == float('inf'):
-                            risultati["Nessun prossimo gol"] += 1
-                else: # Squadra selezionata gioca fuori casa
-                    if next_away_goal < next_home_goal:
-                        risultati["Next Gol: Home"] += 1
-                    elif next_home_goal < next_away_goal:
-                        risultati["Next Gol: Away"] += 1
-                    else:
-                        if next_away_goal == float('inf'):
-                            risultati["Nessun prossimo gol"] += 1
-
-            stats = []
-            for esito, count in risultati.items():
-                perc = round((count / totale_partite) * 100, 2) if totale_partite > 0 else 0
-                odd_min = round(100 / perc, 2) if perc > 0 else "-"
-                stats.append((esito, count, perc, odd_min))
-            
-            df_next_goal = pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
-            st.dataframe(df_next_goal.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        
-        else:
-            st.warning("Nessuna partita trovata per l'analisi dinamica con i filtri selezionati.")
-
-        # Visualizzazione delle statistiche in base alla struttura a scomparsa
-        with st.expander(f"Statistiche Fine Partita (FT) basate sul risultato al {end_min}° minuto", expanded=True):
-            if not filtered_df_dynamic.empty:
-                calcola_winrate(filtered_df_dynamic, "risultato_ft", f"al {end_min}° min")
-                mostra_risultati_esatti(filtered_df_dynamic, "risultato_ft", f"al {end_min}° min")
-                calcola_over_goals(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", f"al {end_min}° min")
-                calcola_btts(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", f"al {end_min}° min")
-            else:
-                st.warning("Nessuna partita trovata per le statistiche con i filtri selezionati.")
-            
-        with st.expander("Statistiche Primo Tempo (HT)", expanded=False):
-            if not df_combined.empty:
-                calcola_winrate(df_combined, "risultato_ht", "HT")
-                mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
-                calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
-                calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", "HT")
-            else:
-                st.warning("Nessuna partita trovata per le statistiche del Primo Tempo.")
-
-        # --- NUOVE SEZIONI DI ANALISI TIMEBAND ---
-        if not filtered_df_dynamic.empty:
-            st.markdown("---")
-            st.subheader("Analisi Dettagliata per Intervalli di Tempo")
-            
-            with st.expander("Timeband 5 Minuti", expanded=True):
-                calcola_stats_timeband(filtered_df_dynamic, start_min, end_min, 5, home_team_selected, away_team_selected)
-                
-            with st.expander("Timeband 15 Minuti", expanded=False):
-                calcola_stats_timeband(filtered_df_dynamic, start_min, end_min, 15, home_team_selected, away_team_selected)
-            
-        # --- NUOVA SEZIONE: ANALISI PER INTERVALLO SPECIFICO ---
-        # Definizione della funzione richiesta
-        def calcola_stats_intervallo_specifico(df_to_analyze, start_min, end_min, home_team_name, away_team_name):
-            """
-            Calcola le statistiche dei gol segnati in un intervallo di tempo personalizzato.
-            
-            Args:
-                df_to_analyze (pd.DataFrame): DataFrame contenente i dati delle partite.
-                start_min (int): Minuto di inizio dell'intervallo.
-                end_min (int): Minuto di fine dell'intervallo.
-                home_team_name (str): Nome della squadra di casa selezionata.
-                away_team_name (str): Nome della squadra in trasferta selezionata.
-            """
-            
-            # Contatori e liste
-            total_matches = len(df_to_analyze)
-            games_with_at_least_one_goal = 0
-            total_goals_in_interval = 0
-            home_team_goals = 0
-            away_team_goals = 0
-
-            # Iterazione sulle righe del DataFrame per calcolare le statistiche
-            for _, row in df_to_analyze.iterrows():
-                # Estrazione dei minuti dei gol, gestendo i valori mancanti o non numerici
-                all_home_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-                all_away_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-                
-                # Calcolo dei gol segnati nell'intervallo specificato
-                goals_home_in_interval = 0
-                goals_away_in_interval = 0
-                
-                # Assicurarsi che i gol siano attribuiti alla squadra corretta
-                if row["home_team"] == home_team_name:
-                    goals_home_in_interval = sum(1 for g in all_home_goal_minutes if start_min < g <= end_min)
-                    goals_away_in_interval = sum(1 for g in all_away_goal_minutes if start_min < g <= end_min)
-                else:
-                    goals_home_in_interval = sum(1 for g in all_away_goal_minutes if start_min < g <= end_min)
-                    goals_away_in_interval = sum(1 for g in all_home_goal_minutes if start_min < g <= end_min)
-                
-                current_match_goals = goals_home_in_interval + goals_away_in_interval
-                
-                # Aggiornamento dei contatori
-                if current_match_goals > 0:
-                    games_with_at_least_one_goal += 1
-                
-                total_goals_in_interval += current_match_goals
-                home_team_goals += goals_home_in_interval
-                away_team_goals += goals_away_in_interval
-            
-            # Calcolo delle percentuali e delle medie
-            perc_at_least_one_goal = round((games_with_at_least_one_goal / total_matches) * 100, 2) if total_matches > 0 else 0
-            media_gol_per_partita = round(total_goals_in_interval / total_matches, 2) if total_matches > 0 else 0
-            
-            # Creazione del DataFrame per la visualizzazione
-            stats_data = [
-                ["Totale Partite Analizzate", total_matches],
-                ["Numero di Partite con almeno 1 Gol", games_with_at_least_one_goal],
-                ["% Partite con almeno 1 Gol", f"{perc_at_least_one_goal}%"],
-                ["Totale Gol Segnati nell'intervallo", total_goals_in_interval],
-                ["Media Gol per Partita nell'intervallo", media_gol_per_partita],
-                [f"Gol Segnati da {home_team_name}", home_team_goals],
-                [f"Gol Segnati da {away_team_name}", away_team_goals]
-            ]
-            
-            df_stats = pd.DataFrame(stats_data, columns=["Metrica", "Valore"])
-            st.dataframe(df_stats)
-        
-        st.markdown("---")
-        st.header("Analisi per Intervallo Specifico")
-        st.subheader("Analisi dei gol segnati solo in un intervallo di minuti personalizzato")
-        
-        col_min_start, col_min_end = st.columns(2)
-        with col_min_start:
-            start_minute_custom = st.number_input("Minuto di inizio", min_value=1, max_value=90, value=40, key="start_minute_custom")
-        with col_min_end:
-            end_minute_custom = st.number_input("Minuto di fine", min_value=1, max_value=90, value=65, key="end_minute_custom")
-
-        if start_minute_custom < end_minute_custom:
-            calcola_stats_intervallo_specifico(df_combined, start_minute_custom, end_minute_custom, home_team_selected, away_team_selected)
-        else:
-            st.warning("Il minuto di inizio deve essere inferiore a quello di fine.")
-    
     else:
         st.warning("Nessuna partita trovata per la combinazione di squadre e campionato selezionata.")
 else:
-    st.info("Seleziona un campionato e due squadre per iniziare.")
+    st.warning("Nessuna partita trovata per il campionato selezionato.")
