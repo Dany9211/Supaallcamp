@@ -420,14 +420,44 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 f"Gol Subiti ({home_team_name})", 
                 f"Gol Fatti ({away_team_name})", 
                 f"Gol Subiti ({away_team_name})", 
-                "% Winrate >= 1 Gol", 
+                "% Partite con >= 1 Gol", 
                 "Odd Minima >= 1 Gol",
-                "% Winrate >= 2 Gol",
+                "% Partite con >= 2 Gol",
                 "Odd Minima >= 2 Gol"
             ])
             st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=[
-                '% Winrate >= 1 Gol', '% Winrate >= 2 Gol'
+                '% Partite con >= 1 Gol', '% Partite con >= 2 Gol'
             ]))
+
+        def calcola_over_goals_dinamico(df_to_analyze, title, start_minute, end_minute):
+            """
+            Calcola la probabilità di Over/Under goals in una fascia di tempo dinamica.
+            """
+            total_matches = len(df_to_analyze)
+            st.subheader(f"Probabilità Over Goals {title} ({total_matches} partite)")
+            
+            over_data = []
+            
+            for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
+                matches_with_goals = 0
+                for _, row in df_to_analyze.iterrows():
+                    home_goals_in_match = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                    away_goals_in_match = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+                    
+                    goals_in_band = [g for g in home_goals_in_match + away_goals_in_match if start_minute <= g <= end_minute]
+                    if len(goals_in_band) > t:
+                        matches_with_goals += 1
+
+                if total_matches > 0:
+                    perc = round((matches_with_goals / total_matches) * 100, 2)
+                    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                else:
+                    perc, odd_min = 0, "-"
+
+                over_data.append([f"Over {t}", matches_with_goals, perc, odd_min])
+
+            df_over = pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+            st.dataframe(df_over.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
 
         # --- SEZIONE ANALISI PRE-PARTITA ---
         st.header("Analisi Pre-Partita")
@@ -516,7 +546,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     st.write(f"Trovate **{len(df_combined_dynamic_ht)}** partite storiche con punteggio di {home_score_dynamic_ht}-{away_score_dynamic_ht} al minuto {current_minute_dynamic_ht} (HT).")
                     
                     # Chiamata alle funzioni statistiche con i dati filtrati
-                    calcola_over_goals(df_combined_dynamic_ht, "gol_home_ht", "gol_away_ht", f"HT (dopo {current_minute_dynamic_ht}')")
+                    calcola_over_goals_dinamico(df_combined_dynamic_ht, f"HT (dopo {current_minute_dynamic_ht}')", current_minute_dynamic_ht + 1, 45)
                     calcola_winrate(df_combined_dynamic_ht, "risultato_ht", f"HT (dopo {current_minute_dynamic_ht}')")
                     mostra_risultati_esatti(df_combined_dynamic_ht, "risultato_ht", f"Risultati Esatti HT (dopo {current_minute_dynamic_ht}')")
                     calcola_btts(df_combined_dynamic_ht, "gol_home_ht", "gol_away_ht", f"HT (dopo {current_minute_dynamic_ht}')")
@@ -560,7 +590,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     st.write(f"Trovate **{len(df_combined_dynamic_ft)}** partite storiche con punteggio di {home_score_dynamic_ft}-{away_score_dynamic_ft} al minuto {current_minute_dynamic_ft}.")
                     
                     # Chiamata alle funzioni statistiche con i dati filtrati
-                    calcola_over_goals(df_combined_dynamic_ft, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic_ft}')")
+                    calcola_over_goals_dinamico(df_combined_dynamic_ft, f"FT (dopo {current_minute_dynamic_ft}')", current_minute_dynamic_ft + 1, 90)
                     calcola_winrate(df_combined_dynamic_ft, "risultato_ft", f"FT (dopo {current_minute_dynamic_ft}')")
                     mostra_risultati_esatti(df_combined_dynamic_ft, "risultato_ft", f"Risultati Esatti FT (dopo {current_minute_dynamic_ft}')")
                     calcola_btts(df_combined_dynamic_ft, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic_ft}')")
