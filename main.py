@@ -342,14 +342,21 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
             return f"{home_goals_count}-{away_goals_count}"
         
-        # --- FUNZIONE PER ANALISI TIMEBAND ---
+        # --- FUNZIONE PER ANALISI TIMEBAND AGGIORNATA CON WINRATE ---
         def calcola_stats_timeband(df_to_analyze, start_min, end_min, timeband_length, home_team_name, away_team_name):
             """
-            Analizza le statistiche dei gol in timeband specifici.
+            Analizza le statistiche dei gol in timeband specifici, mostrando i gol per ogni squadra,
+            la percentuale di partite con almeno un gol segnato/subito per ogni squadra e la
+            percentuale di partite con almeno due gol totali.
             """
             st.subheader(f"Analisi per Timeband di {timeband_length} minuti")
             
             timeband_data = []
+            
+            num_partite = len(df_to_analyze)
+            if num_partite == 0:
+                st.warning("Nessuna partita trovata per questa analisi di timeband.")
+                return
             
             for t_start in range(start_min, end_min, timeband_length):
                 t_end = t_start + timeband_length
@@ -357,41 +364,69 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     t_end = end_min
                 
                 # Inizializza i contatori per l'intervallo corrente
-                total_home_goals = 0
-                total_away_goals = 0
+                total_home_goals_in_interval = 0
+                total_away_goals_in_interval = 0
                 games_with_2_plus_goals = 0
+                home_scored_count = 0
+                away_scored_count = 0
+                home_conceded_count = 0
+                away_conceded_count = 0
                 
                 for _, row in df_to_analyze.iterrows():
-                    # Lista di tutti i minuti dei gol della partita
-                    home_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-                    away_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+                    all_home_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                    all_away_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
                     
-                    # Controlla se le squadre della riga corrispondono a quelle selezionate
                     if row["home_team"] == home_team_name:
-                        current_home_goals = sum(1 for g in home_goal_minutes if t_start < g <= t_end)
-                        current_away_goals = sum(1 for g in away_goal_minutes if t_start < g <= t_end)
-                    else: # Se la squadra selezionata è quella in trasferta
-                        current_home_goals = sum(1 for g in away_goal_minutes if t_start < g <= t_end)
-                        current_away_goals = sum(1 for g in home_goal_minutes if t_start < g <= t_end)
+                        goals_home_selected = sum(1 for g in all_home_goal_minutes if t_start < g <= t_end)
+                        goals_away_selected = sum(1 for g in all_away_goal_minutes if t_start < g <= t_end)
+                    else:
+                        goals_home_selected = sum(1 for g in all_away_goal_minutes if t_start < g <= t_end)
+                        goals_away_selected = sum(1 for g in all_home_goal_minutes if t_start < g <= t_end)
                         
-                    total_home_goals += current_home_goals
-                    total_away_goals += current_away_goals
+                    total_home_goals_in_interval += goals_home_selected
+                    total_away_goals_in_interval += goals_away_selected
                     
-                    if (current_home_goals + current_away_goals) >= 2:
+                    if (goals_home_selected + goals_away_selected) >= 2:
                         games_with_2_plus_goals += 1
                         
-                num_partite = len(df_to_analyze)
-                perc_2_plus_goals = round((games_with_2_plus_goals / num_partite) * 100, 2) if num_partite > 0 else 0
+                    # Calcolo del "winrate" (percentuale di partite con almeno un gol segnato/subito)
+                    if goals_home_selected >= 1:
+                        home_scored_count += 1
+                    if goals_away_selected >= 1:
+                        away_scored_count += 1
+                    if goals_away_selected >= 1: # Un gol subito dalla squadra "home"
+                        home_conceded_count += 1
+                    if goals_home_selected >= 1: # Un gol subito dalla squadra "away"
+                        away_conceded_count += 1
+                
+                perc_2_plus_goals = round((games_with_2_plus_goals / num_partite) * 100, 2)
+                perc_home_scored = round((home_scored_count / num_partite) * 100, 2)
+                perc_away_scored = round((away_scored_count / num_partite) * 100, 2)
+                perc_home_conceded = round((home_conceded_count / num_partite) * 100, 2)
+                perc_away_conceded = round((away_conceded_count / num_partite) * 100, 2)
                 
                 timeband_data.append([
                     f"{t_start}-{t_end}'",
-                    total_home_goals,
-                    total_away_goals,
-                    perc_2_plus_goals
+                    total_home_goals_in_interval,
+                    total_away_goals_in_interval,
+                    f"{perc_home_scored}%",
+                    f"{perc_away_scored}%",
+                    f"{perc_home_conceded}%",
+                    f"{perc_away_conceded}%",
+                    f"{perc_2_plus_goals}%"
                 ])
                 
-            df_timeband_stats = pd.DataFrame(timeband_data, columns=["Intervallo", "Gol Fatti", "Gol Subiti", "Almeno 2 Gol %"])
-            st.dataframe(df_timeband_stats.style.background_gradient(cmap='RdYlGn', subset=['Almeno 2 Gol %']))
+            df_timeband_stats = pd.DataFrame(timeband_data, columns=[
+                "Intervallo",
+                f"Gol Fatti ({home_team_name})",
+                f"Gol Fatti ({away_team_name})",
+                f"Almeno 1 Gol Fatto ({home_team_name})",
+                f"Almeno 1 Gol Fatto ({away_team_name})",
+                f"Almeno 1 Gol Subito ({home_team_name})",
+                f"Almeno 1 Gol Subito ({away_team_name})",
+                "Almeno 2 Gol Totali"
+            ])
+            st.dataframe(df_timeband_stats.style.background_gradient(cmap='RdYlGn', subset=["Almeno 2 Gol Totali"]))
 
         # Filtra il DataFrame combinato in base all'intervallo di tempo e al risultato di partenza
         filtered_df_dynamic = pd.DataFrame()
@@ -474,7 +509,6 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             if not df_combined.empty:
                 calcola_winrate(df_combined, "risultato_ht", "HT")
                 mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
-                mostra_risultati_esatti(df_combined, "risultato_ft", "FT") # Aggiunto come richiesto
                 calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
                 calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", "HT")
             else:
