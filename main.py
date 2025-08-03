@@ -448,11 +448,11 @@ if selected_league != "Seleziona...":
 
                 st.dataframe(margin_counts.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
 
-            def calcola_progressione_risultati(df_to_analyze, home_team_name):
+            def calcola_progressione_risultati_home(df_to_analyze, home_team_name):
                 # Filtra solo le partite in cui la squadra selezionata era in casa
                 df_home_only = df_to_analyze[df_to_analyze["home_team"] == home_team_name]
                 total_matches = len(df_home_only)
-                st.subheader(f"Progressione Risultati per {home_team_name} ({total_matches} partite)")
+                st.subheader(f"Progressione Risultati per {home_team_name} (in Casa) ({total_matches} partite)")
                 if df_home_only.empty:
                     st.write("Nessun dato disponibile per l'analisi della progressione.")
                     return
@@ -519,6 +519,84 @@ if selected_league != "Seleziona...":
                 df_progression["Odd Minima"] = df_progression["Percentuale su partite totali %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
                 st.dataframe(df_progression.style.background_gradient(cmap='RdYlGn', subset=['Percentuale su partite totali %']))
 
+            def calcola_progressione_risultati_away(df_to_analyze, away_team_name):
+                # Filtra solo le partite in cui la squadra selezionata era in trasferta
+                df_away_only = df_to_analyze[df_to_analyze["away_team"] == away_team_name]
+                total_matches = len(df_away_only)
+                st.subheader(f"Progressione Risultati per {away_team_name} (in Trasferta) ({total_matches} partite)")
+                if df_away_only.empty:
+                    st.write("Nessun dato disponibile per l'analisi della progressione.")
+                    return
+
+                went_0_1 = 0
+                went_1_1_after_0_1 = 0
+                went_0_2 = 0
+
+                for _, row in df_away_only.iterrows():
+                    gol_home_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                    gol_away_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+
+                    goal_events = [(m, "home") for m in gol_home_minutes] + [(m, "away") for m in gol_away_minutes]
+                    goal_events.sort(key=lambda x: x[0])
+                    
+                    current_home_score = 0
+                    current_away_score = 0
+                    has_been_0_1 = False
+                    has_been_1_1_after_0_1 = False
+                    has_been_0_2 = False
+
+                    for _, team in goal_events:
+                        if team == "home":
+                            current_home_score += 1
+                        else:
+                            current_away_score += 1
+
+                        if current_home_score == 0 and current_away_score == 1:
+                            has_been_0_1 = True
+                        
+                        if has_been_0_1 and current_home_score == 1 and current_away_score == 1:
+                            has_been_1_1_after_0_1 = True
+
+                        if current_home_score == 0 and current_away_score == 2:
+                            has_been_0_2 = True
+
+                    if has_been_0_1:
+                        went_0_1 += 1
+                    if has_been_1_1_after_0_1:
+                        went_1_1_after_0_1 += 1
+                    if has_been_0_2:
+                        went_0_2 += 1
+                
+                progression_data = {
+                    "Scenario": [
+                        f"{away_team_name} va in vantaggio 0-1",
+                        f"Il punteggio diventa 1-1 dopo lo 0-1",
+                        f"{away_team_name} va in vantaggio 0-2"
+                    ],
+                    "Conteggio": [
+                        went_0_1,
+                        went_1_1_after_0_1,
+                        went_0_2
+                    ],
+                    "Percentuale su partite totali %": [
+                        round((went_0_1 / total_matches) * 100, 2) if total_matches > 0 else 0,
+                        round((went_1_1_after_0_1 / total_matches) * 100, 2) if total_matches > 0 else 0,
+                        round((went_0_2 / total_matches) * 100, 2) if total_matches > 0 else 0
+                    ]
+                }
+                
+                df_progression = pd.DataFrame(progression_data)
+                df_progression["Odd Minima"] = df_progression["Percentuale su partite totali %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+                st.dataframe(df_progression.style.background_gradient(cmap='RdYlGn', subset=['Percentuale su partite totali %']))
+
+            def mostra_progressione_combinata(df_home, df_away, home_team_selected, away_team_selected):
+                st.subheader("Progressione Risultati (Combinata)")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    calcola_progressione_risultati_home(df_home, home_team_selected)
+                with col2:
+                    calcola_progressione_risultati_away(df_away, away_team_selected)
 
             # --- ESECUZIONE E VISUALIZZAZIONE STATS ---
             
@@ -569,8 +647,8 @@ if selected_league != "Seleziona...":
             st.markdown("---")
             st.header("Statistiche sui Gol")
             
-            # Nuova statistica di progressione
-            calcola_progressione_risultati(df_home, home_team_selected)
+            # Nuova statistica di progressione combinata
+            mostra_progressione_combinata(df_home, df_away, home_team_selected, away_team_selected)
 
             col1, col2, col3 = st.columns(3)
             with col1:
