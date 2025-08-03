@@ -267,22 +267,22 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             df_stats = pd.DataFrame(data)
             st.dataframe(df_stats)
             
-        def calcola_primo_gol_stats(df_combined, home_team_name, away_team_name, title):
-            """Calcola le probabilità di chi segna il primo gol della partita/periodo."""
+        def calcola_primo_gol_stats(df_combined, home_team_name, away_team_name, title, start_minute, end_minute):
+            """Calcola le probabilità di chi segna il primo gol della partita/periodo in un intervallo di tempo."""
             st.subheader(f"Chi segna il primo gol? {title} ({len(df_combined)} partite)")
             
             first_goal_stats = defaultdict(int)
-            
             total_matches = len(df_combined)
             
             for _, row in df_combined.iterrows():
                 home_goals = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
                 away_goals = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
                 
-                first_goal_minute_home = min(home_goals) if home_goals else float('inf')
-                first_goal_minute_away = min(away_goals) if away_goals else float('inf')
+                # Trova il primo gol nel range di minuti specificato
+                first_goal_minute_home = min([g for g in home_goals if start_minute <= g <= end_minute] or [float('inf')])
+                first_goal_minute_away = min([g for g in away_goals if start_minute <= g <= end_minute] or [float('inf')])
                 
-                # Chi ha segnato per primo?
+                # Determina chi ha segnato per primo in questo intervallo
                 if first_goal_minute_home < first_goal_minute_away:
                     if row["home_team"] == home_team_name:
                         first_goal_stats[f"{home_team_name}"] += 1
@@ -395,17 +395,27 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             if not df_combined.empty:
                 calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "HT", "gol_home_ht", "gol_away_ht")
                 calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_ht", "gol_away_ht", "HT")
-                calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "HT")
+                calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "HT", 0, 45)
                 calcola_winrate(df_combined, "risultato_ht", "HT")
                 mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
                 calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
                 calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", "HT")
         
+        with st.expander("Statistiche Secondo Tempo (SH)", expanded=False):
+            if not df_combined.empty:
+                calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "SH", "gol_home_sh", "gol_away_sh")
+                calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_sh", "gol_away_sh", "SH")
+                calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "SH", 46, 90)
+                calcola_winrate(df_combined, "risultato_sh", "SH")
+                mostra_risultati_esatti(df_combined, "risultato_sh", "SH")
+                calcola_over_goals(df_combined, "gol_home_sh", "gol_away_sh", "SH")
+                calcola_btts(df_combined, "gol_home_sh", "gol_away_sh", "SH")
+
         with st.expander("Statistiche Fine Partita (FT)", expanded=True):
             if not df_combined.empty:
                 calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "FT", "gol_home_ft", "gol_away_ft")
                 calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_ft", "gol_away_ft", "FT")
-                calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "FT")
+                calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "FT", 0, 90)
                 calcola_winrate(df_combined, "risultato_ft", "FT")
                 mostra_risultati_esatti(df_combined, "risultato_ft", "FT")
                 calcola_over_goals(df_combined, "gol_home_ft", "gol_away_ft", "FT")
