@@ -245,25 +245,32 @@ if selected_league != "Seleziona...":
                 st.dataframe(df_stats.style.background_gradient(cmap='Blues', subset=['% Clean Sheets']).background_gradient(cmap='Reds', subset=['% Fail to Score']))
             
             def calcola_first_to_score(df_to_analyze, home_team_name, away_team_name, timeframe_label):
+                # La funzione è stata corretta per analizzare il DataFrame combinato, ma attribuendo
+                # il primo gol alle squadre selezionate in base a quale ha giocato in casa.
                 st.subheader(f"Prima Squadra a Segnare {timeframe_label} ({len(df_to_analyze)} partite)")
                 if df_to_analyze.empty: return
 
                 time_ranges = {
                     "PT": (1, 45),
                     "ST": (46, 90),
-                    "FT": (1, 150) # Assuming a generous extra time range for FT
+                    "FT": (1, 150)
                 }
                 start_minute, end_minute = time_ranges.get(timeframe_label, (1, 150))
                 
                 risultati = {f"{home_team_name}": 0, f"{away_team_name}": 0, "Nessun Gol": 0}
                 
                 for _, row in df_to_analyze.iterrows():
-                    gol_home_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-                    gol_away_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-
+                    # Identifica correttamente i gol della squadra selezionata di casa e di trasferta
+                    if row["home_team"] == home_team_name:
+                        selected_home_goals_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                        selected_away_goals_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+                    else: # Questo caso si verifica quando analizziamo le partite in trasferta della away_team_selected
+                        selected_home_goals_minutes = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+                        selected_away_goals_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                        
                     # Filtra i gol per il timeframe
-                    gol_home_in_range = [g for g in gol_home_minutes if start_minute <= g <= end_minute]
-                    gol_away_in_range = [g for g in gol_away_minutes if start_minute <= g <= end_minute]
+                    gol_home_in_range = [g for g in selected_home_goals_minutes if start_minute <= g <= end_minute]
+                    gol_away_in_range = [g for g in selected_away_goals_minutes if start_minute <= g <= end_minute]
                     
                     min_home_goal = min(gol_home_in_range) if gol_home_in_range else float('inf')
                     min_away_goal = min(gol_away_in_range) if gol_away_in_range else float('inf')
@@ -277,10 +284,7 @@ if selected_league != "Seleziona...":
 
                 stats = []
                 totale_partite = len(df_to_analyze)
-                if timeframe_label == "ST":
-                    # Per il secondo tempo, calcola su quante partite ci sono stati gol
-                    totale_partite = risultati[f"{home_team_name}"] + risultati[f"{away_team_name}"] + risultati["Nessun Gol"]
-                    
+                
                 for esito, count in risultati.items():
                     perc = round((count / totale_partite) * 100, 2) if totale_partite > 0 else 0
                     odd_min = round(100 / perc, 2) if perc > 0 else "-"
