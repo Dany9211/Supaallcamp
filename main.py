@@ -432,6 +432,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         def calcola_over_goals_dinamico(df_to_analyze, title, start_minute, end_minute):
             """
             Calcola la probabilità di Over/Under goals in una fascia di tempo dinamica.
+            La logica è che basta almeno un gol nel range per l'over 0.5, almeno 2 per l'over 1.5, ecc.
             """
             total_matches = len(df_to_analyze)
             st.subheader(f"Probabilità Over Goals {title} ({total_matches} partite)")
