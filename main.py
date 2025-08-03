@@ -687,7 +687,10 @@ if selected_league != "Seleziona...":
 
             col_sliders_1, col_sliders_2 = st.columns(2)
             with col_sliders_1:
-                selected_minute = st.slider("Minuto di Analisi", 0, 90, 60, key="minute_slider")
+                # Modifica del cursore in un range di minutaggio
+                minutaggio_range = st.slider("Intervallo di minutaggio", 0, 90, (45, 90), key="minute_range_slider")
+                start_minute = minutaggio_range[0]
+                end_minute = minutaggio_range[1]
             with col_sliders_2:
                 starting_score_str = st.text_input("Risultato di Partenza (es. 1-0)", "0-0", key="score_input")
 
@@ -697,7 +700,7 @@ if selected_league != "Seleziona...":
                     starting_score_home, starting_score_away = map(int, starting_score_str.split('-'))
                     # Filtra il DataFrame in base al minutaggio e al risultato di partenza
                     df_dynamic_filtered = df_combined[df_combined.apply(
-                        lambda row: get_scores_at_minute(row, selected_minute, home_team_selected) == starting_score_str,
+                        lambda row: get_scores_at_minute(row, end_minute, home_team_selected) == starting_score_str,
                         axis=1
                     )]
                 else:
@@ -708,7 +711,7 @@ if selected_league != "Seleziona...":
                 df_dynamic_filtered = pd.DataFrame()
             
             if not df_dynamic_filtered.empty:
-                st.write(f"Analisi basata su **{len(df_dynamic_filtered)}** partite in cui il punteggio era **{starting_score_str}** al minuto **{selected_minute}**.")
+                st.write(f"Analisi basata su **{len(df_dynamic_filtered)}** partite in cui il punteggio era **{starting_score_str}** al minuto **{end_minute}**.")
                 
                 # Le funzioni dinamiche usano ora il DataFrame filtrato
                 calcola_winrate(df_dynamic_filtered, "risultato_ft", "Finale (in partite che avevano punteggio specificato al minuto selezionato)")
@@ -719,7 +722,7 @@ if selected_league != "Seleziona...":
 
             else:
                 if starting_score_str and "-" in starting_score_str:
-                    st.warning(f"Nessuna partita trovata in cui il punteggio era {starting_score_str} al minuto {selected_minute}.")
+                    st.warning(f"Nessuna partita trovata in cui il punteggio era {starting_score_str} al minuto {end_minute}.")
                 else:
                     st.info("Inserisci un risultato di partenza valido per avviare l'analisi dinamica.")
 
