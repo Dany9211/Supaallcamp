@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 # Configurazione della pagina
-st.set_page_page_config(page_title="Analisi Squadre Combinate", layout="wide")
+st.set_page_config(page_title="Analisi Squadre Combinate", layout="wide")
 st.title("Analisi Statistiche Combinate per Squadra")
 
 # --- Funzione di connessione al database (cacheata per efficienza) ---
@@ -498,8 +498,8 @@ if selected_league != "Seleziona...":
                         partite_con_almeno_due_gol, 
                         perc, 
                         odd_min, 
-                        f"Segnati: {home_selected_goals_scored}, Subiti: {home_selected_goals_conceded}",
-                        f"Segnati: {away_selected_goals_scored}, Subiti: {away_selected_goals_conceded}"
+                        f"Statistiche {home_team_selected}",
+                        f"Statistiche {away_team_selected}"
                     ])
                     
                 df_result = pd.DataFrame(risultati, columns=[
@@ -743,4 +743,3 @@ if selected_league != "Seleziona...":
             st.warning("Nessuna partita trovata per la combinazione di squadre e campionato selezionata.")
 else:
     st.info("Per iniziare, seleziona un campionato dalla barra laterale.")
-
