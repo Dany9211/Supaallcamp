@@ -317,9 +317,16 @@ if selected_league != "Seleziona...":
 
             st.markdown("---")
             st.header("Analisi Temporale dei Gol")
+            
+            # Analisi per intervalli di 5 minuti
             mostra_distribuzione_timeband(df_combined, "(5 Min)")
+
+            # Analisi per intervalli di 15 minuti
+            mostra_distribuzione_timeband(df_combined, "(15 Min)", timeframe=15)
+
 
         else:
             st.warning("Nessuna partita trovata per la combinazione di squadre e campionato selezionata.")
 else:
     st.info("Per iniziare, seleziona un campionato dalla barra laterale.")
+
