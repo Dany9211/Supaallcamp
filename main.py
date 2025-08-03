@@ -290,39 +290,33 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
             stats = []
             
-            # Helper function to get goal minutes, handling both home and away team roles
-            def get_team_goal_minutes(row, team_name, is_home):
-                if is_home:
-                    # The team is the home team
-                    return [int(x) for x in str(row["minutaggio_gol"]).split(";") if x.isdigit()]
-                else:
-                    # The team is the away team
-                    return [int(x) for x in str(row["minutaggio_gol_away"]).split(";") if x.isdigit()]
-
             for start, end in time_bands:
                 home_goals_count = 0
                 away_goals_count = 0
                 
                 for _, row in df_to_analyze.iterrows():
                     
-                    # Determine which team is Home and which is Away for this specific match
                     is_home_selected_team = row["home_team"] == home_team_name
                     is_away_selected_team = row["away_team"] == away_team_name
                     
+                    # Estrae i minuti dei gol, gestendo i valori NaN e stringhe vuote
+                    home_goal_minutes_str = str(row.get("minutaggio_gol", ""))
+                    away_goal_minutes_str = str(row.get("minutaggio_gol_away", ""))
+
+                    home_goals = [int(x) for x in home_goal_minutes_str.split(";") if x.isdigit()]
+                    away_goals = [int(x) for x in away_goal_minutes_str.split(";") if x.isdigit()]
+                    
                     if is_home_selected_team:
                         # Goals by selected home team vs. goals by opponent
-                        home_goals = [int(x) for x in str(row["minutaggio_gol"]).split(";") if x.isdigit()]
-                        away_goals = [int(x) for x in str(row["minutaggio_gol_away"]).split(";") if x.isdigit()]
+                        home_goals_count += sum(1 for g in home_goals if start <= g < end)
+                        away_goals_count += sum(1 for g in away_goals if start <= g < end)
                     elif is_away_selected_team:
                          # Goals by opponent vs. goals by selected away team
-                        home_goals = [int(x) for x in str(row["minutaggio_gol_away"]).split(";") if x.isdigit()]
-                        away_goals = [int(x) for x in str(row["minutaggio_gol"]).split(";") if x.isdigit()]
+                        home_goals_count += sum(1 for g in away_goals if start <= g < end)
+                        away_goals_count += sum(1 for g in home_goals if start <= g < end)
                     else:
                         continue # Should not happen with current filtering
 
-                    home_goals_count += sum(1 for g in home_goals if start <= g < end)
-                    away_goals_count += sum(1 for g in away_goals if start <= g < end)
-                
                 total_goals = home_goals_count + away_goals_count
                 
                 if len(df_to_analyze) > 0:
@@ -357,10 +351,17 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_over_goals(df_combined, "gol_home_ft", "gol_away_ft", "FT")
                 calcola_btts(df_combined, "gol_home_ft", "gol_away_ft", "FT")
         
-        with st.expander("Analisi per Bande Temporali (Generale)", expanded=False):
+        # --- Nuova sezione per le time bands pre-partita (5 e 15 min) ---
+        with st.expander("Analisi per Bande Temporali (Pre-Partita)", expanded=False):
             if not df_combined.empty:
-                general_time_bands = [(0, 15), (15, 30), (30, 45), (45, 60), (60, 75), (75, 90)]
-                calcola_timeband_stats(df_combined, general_time_bands, f"{home_team_selected} vs {away_team_selected} (Tutte le partite)", home_team_selected, away_team_selected)
+                st.subheader("Bande temporali ogni 5 minuti (0-90)")
+                time_bands_5min = [(i, i + 5) for i in range(0, 90, 5)]
+                calcola_timeband_stats(df_combined, time_bands_5min, f"5 min", home_team_selected, away_team_selected)
+                
+                st.subheader("Bande temporali ogni 15 minuti (0-90)")
+                time_bands_15min = [(i, i + 15) for i in range(0, 90, 15)]
+                calcola_timeband_stats(df_combined, time_bands_15min, f"15 min", home_team_selected, away_team_selected)
+
 
         # --- SEZIONE ANALISI DINAMICA IN-MATCH ---
         st.header("Analisi Dinamica In-Match")
@@ -370,7 +371,6 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         st.subheader("Filtri Dinamici")
         col1_dyn, col2_dyn = st.columns(2)
         with col1_dyn:
-            # Seleziona tutti i possibili risultati parziali per l'input utente
             all_partial_results = [f"{h}-{a}" for h in range(10) for a in range(10)]
             selected_start_result = st.selectbox("Risultato di Partenza", all_partial_results)
         
@@ -382,7 +382,6 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         
         st.markdown("---")
 
-        # --- FUNZIONE DI SUPPORTO PER CALCOLARE I GOL AL MINUTO X ---
         def get_scores_at_minute(df_row, selected_min, home_team_name, away_team_name):
             """
             Calcola il punteggio di una partita a un minuto specifico.
@@ -400,15 +399,12 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
             return f"{home_goals_count}-{away_goals_count}"
 
-        # Filtra il DataFrame combinato in base all'intervallo di tempo e al risultato di partenza
         filtered_df_dynamic = pd.DataFrame()
         if start_min < end_min:
             for _, row in df_combined.iterrows():
                 risultato_attuale = get_scores_at_minute(row, start_min, home_team_selected, away_team_selected)
                 if risultato_attuale == selected_start_result:
                     row_copy = row.copy()
-                    # Per le statistiche dinamiche usiamo i risultati finali reali, non quelli parziali.
-                    # Questo rispetta la richiesta dell'utente di non usare il "range di chiusura".
                     row_copy["risultato_ft"] = row["risultato_ft"]
                     row_copy["gol_home_ft"] = row["gol_home_ft"]
                     row_copy["gol_away_ft"] = row["gol_away_ft"]
@@ -422,8 +418,6 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             totale_partite = len(filtered_df_dynamic)
             
             for _, row in filtered_df_dynamic.iterrows():
-                # Calcola il primo gol segnato nell'intervallo [start_min, end_min]
-                # Questo calcolo va bene perché l'utente vuole sapere chi segna dopo il primo cursore
                 gol_home_dinamici = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit() and start_min <= int(x) <= end_min]
                 gol_away_dinamici = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit() and start_min <= int(x) <= end_min]
                 
@@ -467,23 +461,24 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_btts(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", f"con risultato {selected_start_result} al {start_min}° min")
             else:
                 st.warning("Nessuna partita trovata per le statistiche con i filtri selezionati.")
-                
+        
+        # --- Nuova sezione per le time bands dinamiche (5 e 15 min) ---
         with st.expander("Analisi per Bande Temporali (Dinamica)", expanded=True):
             if not filtered_df_dynamic.empty:
-                dynamic_time_bands = []
-                # Genera intervalli di 5 e 15 minuti a partire da start_min
-                current_min = start_min
-                while current_min < 90:
-                    if current_min + 5 <= 90:
-                        dynamic_time_bands.append((current_min, current_min + 5))
-                    if current_min + 15 <= 90 and (current_min, current_min + 15) not in dynamic_time_bands:
-                        dynamic_time_bands.append((current_min, current_min + 15))
-                    current_min += 5 # Move to the next 5 min interval for the next band
                 
-                # Rimuove duplicati e ordina
-                dynamic_time_bands = sorted(list(set(dynamic_time_bands)))
+                st.subheader(f"Bande temporali ogni 5 minuti (dal {start_min}° min)")
+                time_bands_5min_dynamic = [(i, i + 5) for i in range(start_min, 90, 5)]
+                if time_bands_5min_dynamic:
+                    calcola_timeband_stats(filtered_df_dynamic, time_bands_5min_dynamic, f"5 min dinamiche", home_team_selected, away_team_selected)
+                else:
+                    st.info("Nessun intervallo di 5 minuti dopo il minuto iniziale selezionato.")
 
-                calcola_timeband_stats(filtered_df_dynamic, dynamic_time_bands, f"da {start_min}º min (filtrate)", home_team_selected, away_team_selected)
+                st.subheader(f"Bande temporali ogni 15 minuti (dal {start_min}° min)")
+                time_bands_15min_dynamic = [(i, i + 15) for i in range(start_min, 90, 15)]
+                if time_bands_15min_dynamic:
+                    calcola_timeband_stats(filtered_df_dynamic, time_bands_15min_dynamic, f"15 min dinamiche", home_team_selected, away_team_selected)
+                else:
+                    st.info("Nessun intervallo di 15 minuti dopo il minuto iniziale selezionato.")
             else:
                 st.warning("Nessuna partita trovata per l'analisi dinamica per bande temporali.")
             
