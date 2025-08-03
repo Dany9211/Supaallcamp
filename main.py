@@ -322,6 +322,23 @@ if selected_league != "Seleziona...":
 
                 st.dataframe(combo_counts.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
 
+            def calcola_risultato_esatto_ht_ft(df_to_analyze):
+                """Calcola la distribuzione dei risultati esatti Parziale/Finale (HT/FT)."""
+                st.subheader(f"Risultato Esatto Parziale/Finale (HT/FT) ({len(df_to_analyze)} partite)")
+                df_copy = df_to_analyze.copy()
+                
+                df_copy["exact_ht_ft"] = df_copy["risultato_ht"].astype(str) + "/" + df_copy["risultato_ft"].astype(str)
+                
+                exact_counts = df_copy["exact_ht_ft"].value_counts().reset_index()
+                exact_counts.columns = ["Risultato Esatto HT/FT", "Conteggio"]
+                
+                total = len(df_to_analyze)
+                exact_counts["Percentuale %"] = (exact_counts["Conteggio"] / total * 100).round(2)
+                exact_counts["Odd Minima"] = exact_counts["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+
+                st.dataframe(exact_counts.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+
+
             def calcola_margine_vittoria(df_to_analyze, col_gol_home, col_gol_away, title):
                 """Calcola il margine di vittoria (es. vittoria di 1, 2, 3+ gol)."""
                 st.subheader(f"Margine di Vittoria {title} ({len(df_to_analyze)} partite)")
@@ -501,6 +518,9 @@ if selected_league != "Seleziona...":
             # Combo HT/FT
             calcola_ht_ft_combo(df_combined)
             
+            # Risultato Esatto HT/FT
+            calcola_risultato_esatto_ht_ft(df_combined)
+
             # Margine di Vittoria PT, ST, FT
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -574,7 +594,7 @@ if selected_league != "Seleziona...":
                 if "-" in starting_score_str:
                     # Filtra il DataFrame in base al minutaggio e al risultato di partenza
                     df_dynamic_filtered = df_combined[df_combined.apply(
-                        lambda row: get_scores_at_minute(row, end_minute, home_team_selected, away_team_selected) == starting_score_str,
+                        lambda row: get_scores_at_minute(row, start_minute, home_team_selected, away_team_selected) == starting_score_str,
                         axis=1
                     )]
                 else:
@@ -585,7 +605,7 @@ if selected_league != "Seleziona...":
                 df_dynamic_filtered = pd.DataFrame()
             
             if not df_dynamic_filtered.empty:
-                st.write(f"Analisi basata su **{len(df_dynamic_filtered)}** partite in cui il punteggio era **{starting_score_str}** al minuto **{end_minute}**.")
+                st.write(f"Analisi basata su **{len(df_dynamic_filtered)}** partite in cui il punteggio era **{starting_score_str}** al minuto **{start_minute}**.")
                 
                 # Le funzioni dinamiche usano ora il DataFrame filtrato
                 calcola_winrate(df_dynamic_filtered, "risultato_ft", "Finale (per partite con punteggio specificato)")
@@ -596,7 +616,7 @@ if selected_league != "Seleziona...":
 
             else:
                 if starting_score_str and "-" in starting_score_str:
-                    st.warning(f"Nessuna partita trovata in cui il punteggio era {starting_score_str} al minuto {end_minute}.")
+                    st.warning(f"Nessuna partita trovata in cui il punteggio era {starting_score_str} al minuto {start_minute}.")
                 else:
                     st.info("Inserisci un risultato di partenza valido per avviare l'analisi dinamica.")
 
