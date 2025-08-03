@@ -117,6 +117,14 @@ if selected_league != "Seleziona...":
         if not df_combined.empty:
             
             # --- INIZIO FUNZIONI STATISTICHE ---
+            def get_outcome(home_score, away_score):
+                """Determina l'esito (1, X, 2) da un punteggio."""
+                if home_score > away_score:
+                    return '1'
+                elif home_score < away_score:
+                    return '2'
+                else:
+                    return 'X'
 
             def calcola_winrate(df_to_analyze, col_risultato, title):
                 st.subheader(f"WinRate {title}")
@@ -261,7 +269,7 @@ if selected_league != "Seleziona...":
                 df_stats = pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
                 st.dataframe(df_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
 
-            def mostra_distribuzione_timeband(df_to_analyze, title, timeframe=5):
+            def mostra_distribuzione_timeband(df_to_analyze, title, home_team_name, away_team_name, timeframe=5):
                 st.subheader(f"Distribuzione Gol per Timeframe {title}")
                 if df_to_analyze.empty: return
                 
@@ -283,8 +291,11 @@ if selected_league != "Seleziona...":
                 for (start, end), label in zip(intervalli, label_intervalli):
                     partite_con_gol = 0
                     partite_con_almeno_due_gol = 0
-                    gol_fatti = 0
-                    gol_subiti = 0
+                    
+                    home_selected_goals_scored = 0
+                    home_selected_goals_conceded = 0
+                    away_selected_goals_scored = 0
+                    away_selected_goals_conceded = 0
                     
                     for _, row in df_to_analyze.iterrows():
                         gol_home_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
@@ -292,9 +303,14 @@ if selected_league != "Seleziona...":
                         
                         goals_in_interval_home = sum(1 for g in gol_home_minutes if start <= g <= end)
                         goals_in_interval_away = sum(1 for g in gol_away_minutes if start <= g <= end)
-                        
-                        gol_fatti += goals_in_interval_home
-                        gol_subiti += goals_in_interval_away
+
+                        # Calcolo gol segnati e subiti per le squadre selezionate
+                        if row["home_team"] == home_team_name:
+                            home_selected_goals_scored += goals_in_interval_home
+                            home_selected_goals_conceded += goals_in_interval_away
+                        elif row["away_team"] == away_team_name:
+                            away_selected_goals_scored += goals_in_interval_away
+                            away_selected_goals_conceded += goals_in_interval_home
                         
                         if (goals_in_interval_home + goals_in_interval_away) >= 1:
                             partite_con_gol += 1
@@ -310,10 +326,19 @@ if selected_league != "Seleziona...":
                         partite_con_almeno_due_gol,
                         perc,
                         odd_min,
-                        f"Fatti: {gol_fatti}, Subiti: {gol_subiti}"
+                        f"Segnati: {home_selected_goals_scored}, Subiti: {home_selected_goals_conceded}",
+                        f"Segnati: {away_selected_goals_scored}, Subiti: {away_selected_goals_conceded}"
                     ])
                     
-                df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con 1+ Gol", "Partite con 2+ Gol", "Percentuale % (1+ Gol)", "Odd Minima (1+ Gol)", "Gol Fatti/Subiti"])
+                df_result = pd.DataFrame(risultati, columns=[
+                    "Timeframe", 
+                    "Partite con 1+ Gol", 
+                    "Partite con 2+ Gol", 
+                    "Percentuale % (1+ Gol)", 
+                    "Odd Minima (1+ Gol)", 
+                    f"Statistiche {home_team_name}",
+                    f"Statistiche {away_team_name}"
+                ])
                 st.dataframe(df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale % (1+ Gol)']))
                 
             def calcola_media_gol(df_home, df_away, home_team_name, away_team_name):
@@ -350,6 +375,51 @@ if selected_league != "Seleziona...":
                 
                 df_media = pd.DataFrame(data)
                 st.table(df_media)
+            
+            def calcola_ht_ft_combo(df_to_analyze):
+                st.subheader("Risultato Parziale/Finale (HT/FT)")
+                df_copy = df_to_analyze.copy()
+
+                df_copy["ht_outcome"] = df_copy.apply(lambda row: get_outcome(row["gol_home_ht"], row["gol_away_ht"]), axis=1)
+                df_copy["ft_outcome"] = df_copy.apply(lambda row: get_outcome(row["gol_home_ft"], row["gol_away_ft"]), axis=1)
+
+                df_copy["combo"] = df_copy["ht_outcome"] + "/" + df_copy["ft_outcome"]
+                combo_counts = df_copy["combo"].value_counts().reset_index()
+                combo_counts.columns = ["Risultato", "Conteggio"]
+                
+                total = len(df_to_analyze)
+                combo_counts["Percentuale %"] = (combo_counts["Conteggio"] / total * 100).round(2)
+                combo_counts["Odd Minima"] = combo_counts["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+
+                st.dataframe(combo_counts.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+
+            def calcola_margine_vittoria(df_to_analyze, col_gol_home, col_gol_away, title):
+                st.subheader(f"Margine di Vittoria {title}")
+                df_copy = df_to_analyze.copy()
+                df_copy["gol_diff"] = pd.to_numeric(df_copy[col_gol_home], errors='coerce').fillna(0) - pd.to_numeric(df_copy[col_gol_away], errors='coerce').fillna(0)
+                
+                def classify_margin(diff):
+                    if diff > 0:
+                        if diff == 1: return "Casa vince di 1"
+                        elif diff == 2: return "Casa vince di 2"
+                        else: return "Casa vince di 3+"
+                    elif diff < 0:
+                        if diff == -1: return "Trasferta vince di 1"
+                        elif diff == -2: return "Trasferta vince di 2"
+                        else: return "Trasferta vince di 3+"
+                    else:
+                        return "Pareggio"
+                
+                df_copy["margine"] = df_copy["gol_diff"].apply(classify_margin)
+                
+                margin_counts = df_copy["margine"].value_counts().reset_index()
+                margin_counts.columns = ["Margine", "Conteggio"]
+                total = len(df_to_analyze)
+                margin_counts["Percentuale %"] = (margin_counts["Conteggio"] / total * 100).round(2)
+                margin_counts["Odd Minima"] = margin_counts["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+
+                st.dataframe(margin_counts.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+
 
             # --- ESECUZIONE E VISUALIZZAZIONE STATS ---
             
@@ -377,12 +447,26 @@ if selected_league != "Seleziona...":
             with col3:
                 calcola_winrate(df_combined, "risultato_ft", "FT")
 
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
                 mostra_risultati_esatti(df_combined, "risultato_ht", "PT")
             with col2:
+                mostra_risultati_esatti(df_combined, "risultato_sh", "ST")
+            with col3:
                 mostra_risultati_esatti(df_combined, "risultato_ft", "FT")
+
+            # Nuove stats
+            calcola_ht_ft_combo(df_combined)
             
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                calcola_margine_vittoria(df_combined, "gol_home_ht", "gol_away_ht", "PT")
+            with col2:
+                calcola_margine_vittoria(df_combined, "gol_home_sh", "gol_away_sh", "ST")
+            with col3:
+                calcola_margine_vittoria(df_combined, "gol_home_ft", "gol_away_ft", "FT")
+
+
             st.markdown("---")
             st.header("Statistiche sui Gol")
 
@@ -416,10 +500,10 @@ if selected_league != "Seleziona...":
             calcola_first_to_score(df_combined, "FT")
             
             # Analisi per intervalli di 5 minuti
-            mostra_distribuzione_timeband(df_combined, "(5 Min)")
+            mostra_distribuzione_timeband(df_combined, "(5 Min)", home_team_selected, away_team_selected)
 
             # Analisi per intervalli di 15 minuti
-            mostra_distribuzione_timeband(df_combined, "(15 Min)", timeframe=15)
+            mostra_distribuzione_timeband(df_combined, "(15 Min)", home_team_selected, away_team_selected, timeframe=15)
 
 
         else:
