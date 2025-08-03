@@ -402,8 +402,8 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 
                 timeband_data.append([
                     f"{t_start}-{t_end}'",
-                    f"{perc_1_plus_goals}%",
-                    f"{perc_2_plus_goals}%",
+                    perc_1_plus_goals,
+                    perc_2_plus_goals,
                     home_goals_stats,
                     away_goals_stats
                 ])
@@ -417,7 +417,14 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             ])
             
             # Applica una formattazione condizionale per evidenziare le percentuali
-            st.dataframe(df_timeband_stats.style.background_gradient(cmap='RdYlGn', subset=["Almeno 1 Gol %", "Almeno 2 Gol %"]))
+            st.dataframe(
+                df_timeband_stats.style.background_gradient(
+                    cmap='RdYlGn', 
+                    subset=["Almeno 1 Gol %", "Almeno 2 Gol %"]
+                ).format(
+                    {'Almeno 1 Gol %': "{:.2f}%", 'Almeno 2 Gol %': "{:.2f}%"}
+                )
+            )
 
         # Filtra il DataFrame combinato in base all'intervallo di tempo e al risultato di partenza
         filtered_df_dynamic = pd.DataFrame()
