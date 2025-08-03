@@ -1,10 +1,3 @@
-Certamente. Mi scuso per l'errore. La risposta precedente ha incluso del testo di conversazione all'inizio, che ha causato un errore di sintassi quando il file è stato eseguito.
-
-Ti fornirò un'unica risposta che contiene solo il codice Python corretto e completo, con la funzione `calcola_doppia_chance` e le relative chiamate già inserite nelle sezioni pre-partita e dinamiche.
-
-Ecco il codice aggiornato, pronto per essere copiato e utilizzato:
-
-```python
 import streamlit as st
 import psycopg2
 import pandas as pd
@@ -664,5 +657,3 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         st.warning("Seleziona una squadra 'CASA' e una 'TRASFERTA' per avviare l'analisi.")
 else:
     st.info("Seleziona un campionato e due squadre per iniziare.")
-
-```
