@@ -342,12 +342,11 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
             return f"{home_goals_count}-{away_goals_count}"
         
-        # --- FUNZIONE PER ANALISI TIMEBAND AGGIORNATA CON WINRATE ---
+        # --- FUNZIONE PER ANALISI TIMEBAND AGGIORNATA ---
         def calcola_stats_timeband(df_to_analyze, start_min, end_min, timeband_length, home_team_name, away_team_name):
             """
-            Analizza le statistiche dei gol in timeband specifici, mostrando i gol per ogni squadra,
-            la percentuale di partite con almeno un gol segnato/subito per ogni squadra e la
-            percentuale di partite con almeno due gol totali.
+            Analizza le statistiche dei gol in timeband specifici, mostrando la percentuale
+            di partite con almeno 1 o 2 gol, e i gol fatti/subiti per squadra.
             """
             st.subheader(f"Analisi per Timeband di {timeband_length} minuti")
             
@@ -366,11 +365,8 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 # Inizializza i contatori per l'intervallo corrente
                 total_home_goals_in_interval = 0
                 total_away_goals_in_interval = 0
+                games_with_1_plus_goals = 0
                 games_with_2_plus_goals = 0
-                home_scored_count = 0
-                away_scored_count = 0
-                home_conceded_count = 0
-                away_conceded_count = 0
                 
                 for _, row in df_to_analyze.iterrows():
                     all_home_goal_minutes = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
@@ -382,51 +378,46 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                     else:
                         goals_home_selected = sum(1 for g in all_away_goal_minutes if t_start < g <= t_end)
                         goals_away_selected = sum(1 for g in all_home_goal_minutes if t_start < g <= t_end)
+                    
+                    total_goals_in_interval = goals_home_selected + goals_away_selected
+                    
+                    if total_goals_in_interval >= 1:
+                        games_with_1_plus_goals += 1
+                    if total_goals_in_interval >= 2:
+                        games_with_2_plus_goals += 1
                         
                     total_home_goals_in_interval += goals_home_selected
                     total_away_goals_in_interval += goals_away_selected
-                    
-                    if (goals_home_selected + goals_away_selected) >= 2:
-                        games_with_2_plus_goals += 1
-                        
-                    # Calcolo del "winrate" (percentuale di partite con almeno un gol segnato/subito)
-                    if goals_home_selected >= 1:
-                        home_scored_count += 1
-                    if goals_away_selected >= 1:
-                        away_scored_count += 1
-                    if goals_away_selected >= 1: # Un gol subito dalla squadra "home"
-                        home_conceded_count += 1
-                    if goals_home_selected >= 1: # Un gol subito dalla squadra "away"
-                        away_conceded_count += 1
+
+                # La squadra di casa selezionata ha segnato 'total_home_goals_in_interval'
+                # e subito 'total_away_goals_in_interval'
+                home_goals_stats = f"Fatti: {total_home_goals_in_interval} / Subiti: {total_away_goals_in_interval}"
                 
+                # La squadra in trasferta selezionata ha segnato 'total_away_goals_in_interval'
+                # e subito 'total_home_goals_in_interval'
+                away_goals_stats = f"Fatti: {total_away_goals_in_interval} / Subiti: {total_home_goals_in_interval}"
+                
+                perc_1_plus_goals = round((games_with_1_plus_goals / num_partite) * 100, 2)
                 perc_2_plus_goals = round((games_with_2_plus_goals / num_partite) * 100, 2)
-                perc_home_scored = round((home_scored_count / num_partite) * 100, 2)
-                perc_away_scored = round((away_scored_count / num_partite) * 100, 2)
-                perc_home_conceded = round((home_conceded_count / num_partite) * 100, 2)
-                perc_away_conceded = round((away_conceded_count / num_partite) * 100, 2)
                 
                 timeband_data.append([
                     f"{t_start}-{t_end}'",
-                    total_home_goals_in_interval,
-                    total_away_goals_in_interval,
-                    f"{perc_home_scored}%",
-                    f"{perc_away_scored}%",
-                    f"{perc_home_conceded}%",
-                    f"{perc_away_conceded}%",
-                    f"{perc_2_plus_goals}%"
+                    f"{perc_1_plus_goals}%",
+                    f"{perc_2_plus_goals}%",
+                    home_goals_stats,
+                    away_goals_stats
                 ])
                 
             df_timeband_stats = pd.DataFrame(timeband_data, columns=[
                 "Intervallo",
-                f"Gol Fatti ({home_team_name})",
-                f"Gol Fatti ({away_team_name})",
-                f"Almeno 1 Gol Fatto ({home_team_name})",
-                f"Almeno 1 Gol Fatto ({away_team_name})",
-                f"Almeno 1 Gol Subito ({home_team_name})",
-                f"Almeno 1 Gol Subito ({away_team_name})",
-                "Almeno 2 Gol Totali"
+                "Almeno 1 Gol %",
+                "Almeno 2 Gol %",
+                f"Gol Fatti/Subiti ({home_team_name})",
+                f"Gol Fatti/Subiti ({away_team_name})"
             ])
-            st.dataframe(df_timeband_stats.style.background_gradient(cmap='RdYlGn', subset=["Almeno 2 Gol Totali"]))
+            
+            # Applica una formattazione condizionale per evidenziare le percentuali
+            st.dataframe(df_timeband_stats.style.background_gradient(cmap='RdYlGn', subset=["Almeno 1 Gol %", "Almeno 2 Gol %"]))
 
         # Filtra il DataFrame combinato in base all'intervallo di tempo e al risultato di partenza
         filtered_df_dynamic = pd.DataFrame()
