@@ -307,7 +307,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         
         # Filtri dinamici
         st.subheader("Filtri Dinamici")
-        col1_dyn, col2_dyn, col3_dyn = st.columns(3)
+        col1_dyn, col2_dyn = st.columns(2)
         with col1_dyn:
             # Seleziona tutti i possibili risultati parziali per l'input utente
             all_partial_results = [f"{h}-{a}" for h in range(10) for a in range(10)]
@@ -318,9 +318,6 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 'Seleziona intervallo di tempo (minuti)',
                 0, 90, (45, 90)
             )
-        
-        with col3_dyn:
-            selected_time_frame = st.selectbox("Visualizza statistiche per", ["Fine Partita (FT)", "Primo Tempo (HT)"])
         
         st.markdown("---")
 
@@ -407,22 +404,12 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             
             df_next_goal = pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
             st.dataframe(df_next_goal.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-
+        
         else:
             st.warning("Nessuna partita trovata per l'analisi dinamica con i filtri selezionati.")
-        
-        # Visualizzazione delle statistiche in base al menu a tendina
-        if selected_time_frame == "Primo Tempo (HT)":
-            st.header(f"Statistiche basate sul risultato al {end_min}° minuto")
-            if not df_combined.empty:
-                calcola_winrate(df_combined, "risultato_ht", f"HT")
-                mostra_risultati_esatti(df_combined, "risultato_ht", f"HT")
-                calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", f"HT")
-                calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", f"HT")
-            else:
-                st.warning("Nessuna partita trovata per le statistiche con i filtri selezionati.")
-        else: # Default: Fine Partita (FT)
-            st.header(f"Statistiche basate sul risultato al {end_min}° minuto")
+
+        # Visualizzazione delle statistiche in base alla struttura a scomparsa
+        with st.expander(f"Statistiche Fine Partita (FT) basate sul risultato al {end_min}° minuto", expanded=True):
             if not filtered_df_dynamic.empty:
                 calcola_winrate(filtered_df_dynamic, "risultato_ft", f"al {end_min}° min")
                 mostra_risultati_esatti(filtered_df_dynamic, "risultato_ft", f"al {end_min}° min")
@@ -430,6 +417,15 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_btts(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", f"al {end_min}° min")
             else:
                 st.warning("Nessuna partita trovata per le statistiche con i filtri selezionati.")
+            
+        with st.expander("Statistiche Primo Tempo (HT)", expanded=False):
+            if not df_combined.empty:
+                calcola_winrate(df_combined, "risultato_ht", "HT")
+                mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
+                calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
+                calcola_btts(df_combined, "gol_home_ht", "gol_away_ht", "HT")
+            else:
+                st.warning("Nessuna partita trovata per le statistiche del Primo Tempo.")
             
     else:
         st.warning("Seleziona una squadra 'CASA' e una 'TRASFERTA' per avviare l'analisi.")
