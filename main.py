@@ -60,7 +60,6 @@ else:
     st.sidebar.warning("Colonne mancanti per il calcolo delle statistiche del Secondo Tempo.")
 
 # Converti le colonne dei minutaggi gol da stringhe a liste di interi
-# CORREZIONE QUI: Aggiunto un blocco try-except per gestire i valori non validi
 for col in ['minutaggio_gol', 'minutaggio_gol_away']:
     if col in df.columns:
         df[col] = df[col].apply(
@@ -406,9 +405,23 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         # --- Sezione per le analisi Pre-partita ---
         with st.expander("Analisi Statistiche Pre-partita", expanded=False):
             # Calcolo e visualizzazione delle statistiche
-            calcola_winrate(df_combined, 'risultato', "FT", df_home, df_away)
-            calcola_doppia_chance(df_combined, 'risultato', "FT", df_home, df_away)
-            mostra_risultati_esatti(df_combined, 'risultato', "FT", df_home, df_away)
+            calcola_winrate(df_combined, 'risultato_ft', "FT", df_home, df_away)
+            calcola_doppia_chance(df_combined, 'risultato_ft', "FT", df_home, df_away)
+            mostra_risultati_esatti(df_combined, 'risultato_ft', "FT", df_home, df_away)
+
+            # Nuova sezione per l'analisi dei gol totali
+            st.markdown("---")
+            st.subheader("Analisi Goal Totali FT")
+            goal_counts = df_combined['totale_gol_ft'].value_counts().sort_index()
+            total_matches = len(df_combined)
+            goal_distribution = pd.DataFrame({
+                "Numero Gol": goal_counts.index,
+                "Conteggio": goal_counts.values,
+                "Probabilità %": (goal_counts.values / total_matches * 100).round(2),
+                "Odd Minima": (100 / (goal_counts.values / total_matches * 100)).round(2)
+            })
+            st.dataframe(goal_distribution)
+
             calcola_over_goals(df_combined, 'gol_home_ft', 'gol_away_ft', "FT", df_home, df_away)
             calcola_btts(df_combined, 'gol_home_ft', 'gol_away_ft', "FT", df_home, df_away)
             calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, 'gol_home_ft', 'gol_away_ft', "FT")
@@ -422,6 +435,48 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
             calcola_over_goals(df_combined, 'gol_home_sh', 'gol_away_sh', "SH", df_home, df_away)
             calcola_btts(df_combined, 'gol_home_sh', 'gol_away_sh', "SH", df_home, df_away)
             calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "SH", 'gol_home_sh', 'gol_away_sh')
+
+            # Nuova sezione: Distribuzione gol per intervallo di tempo
+            st.markdown("---")
+            st.subheader("Distribuzione Gol per Intervallo di Tempo (Pre-partita)")
+            st.info("Mostra la distribuzione dei gol in base al minuto in partite casalinghe per la squadra di casa e in trasferta per la squadra ospite.")
+
+            def get_goal_distribution_by_time(df_matches, time_bands, team_name):
+                time_stats = defaultdict(int)
+                total_goals = 0
+                for _, row in df_matches.iterrows():
+                    goal_minutes_home = row.get('minutaggio_gol', []) if row['home_team'] == team_name else []
+                    goal_minutes_away = row.get('minutaggio_gol_away', []) if row['away_team'] == team_name else []
+                    all_goals = goal_minutes_home + goal_minutes_away
+                    total_goals += len(all_goals)
+                    for minute in all_goals:
+                        for start, end in time_bands:
+                            if start <= minute <= end:
+                                time_stats[f"{start}-{end}"] += 1
+                                break
+                
+                results = []
+                for band in sorted(time_stats.keys(), key=lambda x: int(x.split('-')[0])):
+                    count = time_stats.get(band, 0)
+                    percentage = (count / total_goals * 100).round(2) if total_goals > 0 else 0
+                    results.append({
+                        "Banda Minuti": band,
+                        "Conteggio Gol": count,
+                        "% su totale gol": f"{percentage}%"
+                    })
+                return pd.DataFrame(results)
+
+            time_bands = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
+            col_home, col_away = st.columns(2)
+            with col_home:
+                st.write(f"**Gol segnati da {home_team_selected} (in casa)**")
+                df_home_goals = get_goal_distribution_by_time(df_home, time_bands, home_team_selected)
+                st.dataframe(df_home_goals, use_container_width=True)
+            with col_away:
+                st.write(f"**Gol segnati da {away_team_selected} (in trasferta)**")
+                df_away_goals = get_goal_distribution_by_time(df_away, time_bands, away_team_selected)
+                st.dataframe(df_away_goals, use_container_width=True)
+
 
         # --- Interfaccia utente per i parametri dinamici ---
         st.header(f"Analisi Dinamica: {home_team_selected} vs {away_team_selected}")
