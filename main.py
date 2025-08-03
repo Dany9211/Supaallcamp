@@ -34,7 +34,16 @@ except Exception as e:
     st.stop()
 
 # --- Aggiunta di colonne calcolate per facilitare le analisi ---
-if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
+# Elenco delle colonne necessarie per l'applicazione
+required_columns = [
+    "league", "home_team", "away_team", "gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht"
+]
+
+# Controllo che tutte le colonne necessarie siano presenti
+if not all(col in df.columns for col in required_columns):
+    st.error("Il DataFrame manca di una o più colonne essenziali: 'league', 'home_team', 'away_team', 'gol_home_ft', 'gol_away_ft', 'gol_home_ht', 'gol_away_ht'. Assicurati che lo schema del database sia corretto.")
+    st.stop()
+else:
     df["risultato_ft"] = df["gol_home_ft"].astype(str) + "-" + df["gol_away_ft"].astype(str)
     # Aggiungi le colonne che indicano se una squadra ha segnato nel primo e secondo tempo
     df["home_ht_gol"] = df["gol_home_ht"] > 0
@@ -43,13 +52,13 @@ if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
     df["away_ft_gol"] = (df["gol_away_ft"] - df["gol_away_ht"]) > 0
 
 # --- UI per la selezione delle squadre e del campionato ---
-st.header("Seleziona le squadre e il campionato")
-campionato_options = ["Tutti i campionati"] + sorted(df["campionato"].unique())
-campionato_selected = st.selectbox("Seleziona Campionato", campionato_options)
+st.header("Seleziona le squadre e la lega")
+league_options = ["Tutte le leghe"] + sorted(df["league"].unique())
+league_selected = st.selectbox("Seleziona Lega", league_options)
 
-df_campionato = df if campionato_selected == "Tutti i campionati" else df[df["campionato"] == campionato_selected]
+df_league = df if league_selected == "Tutte le leghe" else df[df["league"] == league_selected]
 
-squadre_possibili = sorted(pd.concat([df_campionato["home_team"], df_campionato["away_team"]]).unique())
+squadre_possibili = sorted(pd.concat([df_league["home_team"], df_league["away_team"]]).unique())
 
 col_home_team, col_away_team = st.columns(2)
 with col_home_team:
@@ -125,9 +134,9 @@ def calcola_stats_to_score(df_filtered, home_team, away_team):
     
 # --- Visualizzazione dei risultati ---
 if home_team_selected and away_team_selected:
-    df_combined = df_campionato[
-        (df_campionato["home_team"] == home_team_selected) &
-        (df_campionato["away_team"] == away_team_selected)
+    df_combined = df_league[
+        (df_league["home_team"] == home_team_selected) &
+        (df_league["away_team"] == away_team_selected)
     ]
 
     if not df_combined.empty:
@@ -180,6 +189,6 @@ if home_team_selected and away_team_selected:
         calcola_stats_intervallo_specifico(df_combined, start_minute_15, end_minute_15, home_team_selected, away_team_selected)
         
     else:
-        st.warning("Nessuna partita trovata per la combinazione di squadre e campionato selezionata.")
+        st.warning("Nessuna partita trovata per la combinazione di squadre e lega selezionata.")
 else:
     st.info("Seleziona due squadre per avviare l'analisi.")
