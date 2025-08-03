@@ -204,8 +204,14 @@ if selected_league != "Seleziona...":
                 st.subheader(f"Distribuzione Gol per Timeframe {title}")
                 if df_to_analyze.empty: return
                 
-                intervalli = [(i, i + timeframe - 1) for i in range(0, 90, timeframe)] + [(90, 150)]
-                label_intervalli = [f"{start}-{end}" for start, end in intervalli[:-1]] + ["90+"]
+                if timeframe == 15:
+                    # 15-minute intervals as requested (0-15, 16-30, etc.)
+                    intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90), (91, 150)]
+                    label_intervalli = [f"{start}-{end}" for start, end in intervalli[:-1]] + ["90+"]
+                else:
+                    # 5-minute intervals as requested (0-5, 6-10, etc.)
+                    intervalli = [(i, i + timeframe - 1) for i in range(0, 90, timeframe)] + [(90, 150)]
+                    label_intervalli = [f"{start}-{end}" for start, end in intervalli[:-1]] + ["90+"]
                 
                 risultati = []
                 totale_partite = len(df_to_analyze)
