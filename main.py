@@ -122,7 +122,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
 
         def calcola_winrate(df_to_analyze, col_risultato, title):
             """Calcola e mostra il WinRate basato sui risultati complessivi."""
-            st.subheader(f"WinRate Finale {title} ({len(df_to_analyze)} partite)")
+            st.subheader(f"WinRate {title} ({len(df_to_analyze)} partite)")
             df_valid = df_to_analyze[df_to_analyze[col_risultato].notna() & (df_to_analyze[col_risultato].str.contains("-"))].copy()
             
             risultati = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
@@ -151,7 +151,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
 
         def mostra_risultati_esatti(df_to_analyze, col_risultato, titolo):
             """Mostra la distribuzione dei risultati esatti."""
-            st.subheader(f"Risultati Esatti Finali {titolo} ({len(df_to_analyze)} partite)")
+            st.subheader(f"Risultati Esatti {titolo} ({len(df_to_analyze)} partite)")
             risultati_interessanti = [
                 "0-0", "0-1", "0-2", "0-3", "1-0", "1-1", "1-2", "1-3",
                 "2-0", "2-1", "2-2", "2-3", "3-0", "3-1", "3-2", "3-3"
@@ -176,7 +176,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
 
         def calcola_over_goals(df_to_analyze, col_gol_home, col_gol_away, title):
             """Calcola la distribuzione Over/Under goals."""
-            st.subheader(f"Over/Under Goals Finali {title} ({len(df_to_analyze)} partite)")
+            st.subheader(f"Over/Under Goals {title} ({len(df_to_analyze)} partite)")
             df_copy = df_to_analyze.copy()
             df_copy["tot_goals"] = pd.to_numeric(df_copy[col_gol_home], errors='coerce').fillna(0) + pd.to_numeric(df_copy[col_gol_away], errors='coerce').fillna(0)
             
@@ -192,7 +192,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
 
         def calcola_btts(df_to_analyze, col_gol_home, col_gol_away, title):
             """Calcola la statistica GG/NG."""
-            st.subheader(f"Entrambe le Squadre a Segno (GG/NG) Finali {title} ({len(df_to_analyze)} partite)")
+            st.subheader(f"Entrambe le Squadre a Segno (GG/NG) {title} ({len(df_to_analyze)} partite)")
             df_copy = df_to_analyze.copy()
             df_copy["home_scored"] = pd.to_numeric(df_copy[col_gol_home], errors='coerce').fillna(0) > 0
             df_copy["away_scored"] = pd.to_numeric(df_copy[col_gol_away], errors='coerce').fillna(0) > 0
@@ -441,10 +441,11 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
 
 
         if not filtered_df_dynamic.empty:
-            st.subheader(f"Analisi per le partite che avevano un risultato di {selected_start_result} al {start_min}° minuto ({len(filtered_df_dynamic)} partite)")
+            st.subheader(f"Partite filtrate: {len(filtered_df_dynamic)} partite con risultato di {selected_start_result} al {start_min}° minuto")
+            st.markdown("---")
             
             # Calcolo next goal
-            st.subheader("Prossimo Gol (nel periodo dinamico)")
+            st.subheader("Statistiche sul 'Prossimo Gol' (nel periodo dinamico)")
             risultati = {"Next Gol: Home": 0, "Next Gol: Away": 0, "Nessun prossimo gol": 0}
             totale_partite = len(filtered_df_dynamic)
             
@@ -484,27 +485,32 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         else:
             st.warning("Nessuna partita trovata per l'analisi dinamica con i filtri selezionati.")
 
-        with st.expander(f"Statistiche sul RISULTATO FINALE (FT) per le partite filtrate ({len(filtered_df_dynamic)} partite)", expanded=True):
+        with st.expander(f"Statistiche di RISULTATO FINALE (FT) per le partite filtrate ({len(filtered_df_dynamic)} partite)", expanded=True):
             if not filtered_df_dynamic.empty:
-                calcola_winrate(filtered_df_dynamic, "risultato_ft", f" (dopo {selected_start_result} al {start_min}° min)")
-                mostra_risultati_esatti(filtered_df_dynamic, "risultato_ft", f" (dopo {selected_start_result} al {start_min}° min)")
-                calcola_over_goals(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", f" (dopo {selected_start_result} al {start_min}° min)")
-                calcola_btts(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", f" (dopo {selected_start_result} al {start_min}° min)")
+                st.subheader("WinRate Finale (FT)")
+                calcola_winrate(filtered_df_dynamic, "risultato_ft", "Finale (FT)")
+                st.subheader("Risultati Esatti Finali (FT)")
+                mostra_risultati_esatti(filtered_df_dynamic, "risultato_ft", "Finali (FT)")
+                st.subheader("Over/Under Goals Finali (FT)")
+                calcola_over_goals(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", "Finali (FT)")
+                st.subheader("Entrambe le Squadre a Segno (GG/NG) Finali (FT)")
+                calcola_btts(filtered_df_dynamic, "gol_home_ft", "gol_away_ft", "Finali (FT)")
             else:
                 st.warning("Nessuna partita trovata per le statistiche con i filtri selezionati.")
         
         # --- Nuova sezione per le time bands dinamiche (5 e 15 min) ---
         with st.expander("Analisi per Bande Temporali (Dinamica)", expanded=False):
             if not filtered_df_dynamic.empty:
+                st.subheader(f"Statistiche di Gol nelle Bande Temporali (dal {start_min}° min)")
                 
-                st.subheader(f"Bande temporali ogni 5 minuti (dal {start_min}° min)")
+                st.markdown("Bande temporali ogni 5 minuti")
                 time_bands_5min_dynamic = [(i, i + 5) for i in range(start_min, 90, 5)]
                 if time_bands_5min_dynamic:
                     calcola_timeband_stats(filtered_df_dynamic, time_bands_5min_dynamic, f"Dinamica 5 min", home_team_selected, away_team_selected)
                 else:
                     st.info("Nessun intervallo di 5 minuti dopo il minuto iniziale selezionato.")
 
-                st.subheader(f"Bande temporali ogni 15 minuti (dal {start_min}° min)")
+                st.markdown("Bande temporali ogni 15 minuti")
                 time_bands_15min_dynamic = [(i, i + 15) for i in range(start_min, 90, 15)]
                 if time_bands_15min_dynamic:
                     calcola_timeband_stats(filtered_df_dynamic, time_bands_15min_dynamic, f"Dinamica 15 min", home_team_selected, away_team_selected)
