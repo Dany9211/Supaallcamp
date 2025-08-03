@@ -282,17 +282,17 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 first_goal_minute_home = min([g for g in home_goals if start_minute <= g <= end_minute] or [float('inf')])
                 first_goal_minute_away = min([g for g in away_goals if start_minute <= g <= end_minute] or [float('inf')])
                 
-                # Determina chi ha segnato per primo in questo intervallo
+                # CORREZIONE: Assegna il gol alla squadra selezionata, indipendentemente se è "home" o "away" nel record storico
                 if first_goal_minute_home < first_goal_minute_away:
                     if row["home_team"] == home_team_name:
-                        first_goal_stats[f"{home_team_name}"] += 1
-                    else:
-                        first_goal_stats[f"{away_team_name}"] += 1
+                        first_goal_stats[home_team_name] += 1
+                    else: # Questo significa che la squadra "away_team_selected" ha segnato il primo gol (in uno dei suoi match storici)
+                        first_goal_stats[away_team_name] += 1
                 elif first_goal_minute_away < first_goal_minute_home:
-                    if row["away_team"] == home_team_name:
-                        first_goal_stats[f"{home_team_name}"] += 1
-                    else:
-                        first_goal_stats[f"{away_team_name}"] += 1
+                    if row["away_team"] == away_team_name:
+                        first_goal_stats[away_team_name] += 1
+                    else: # Questo significa che la squadra "home_team_selected" ha segnato il primo gol (in uno dei suoi match storici)
+                        first_goal_stats[home_team_name] += 1
                 else:
                     first_goal_stats["Nessun gol"] += 1
             
@@ -320,16 +320,17 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 last_goal_minute_home = max([g for g in home_goals if start_minute <= g <= end_minute] or [-1])
                 last_goal_minute_away = max([g for g in away_goals if start_minute <= g <= end_minute] or [-1])
 
+                # CORREZIONE: Assegna il gol alla squadra selezionata
                 if last_goal_minute_home > last_goal_minute_away:
                     if row["home_team"] == home_team_name:
-                        last_goal_stats[f"{home_team_name}"] += 1
+                        last_goal_stats[home_team_name] += 1
                     else:
-                        last_goal_stats[f"{away_team_name}"] += 1
+                        last_goal_stats[away_team_name] += 1
                 elif last_goal_minute_away > last_goal_minute_home:
-                    if row["away_team"] == home_team_name:
-                        last_goal_stats[f"{home_team_name}"] += 1
+                    if row["away_team"] == away_team_name:
+                        last_goal_stats[away_team_name] += 1
                     else:
-                        last_goal_stats[f"{away_team_name}"] += 1
+                        last_goal_stats[home_team_name] += 1
                 else:
                     last_goal_stats["Nessun gol"] += 1
             
