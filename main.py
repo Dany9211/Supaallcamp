@@ -414,13 +414,13 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 if first_goal_minute_home < first_goal_minute_away:
                     if row["home_team"] == home_team_name:
                         first_goal_stats[home_team_name] += 1
-                    else:
+                    elif row["home_team"] == away_team_name:
                         first_goal_stats[away_team_name] += 1
                 elif first_goal_minute_away < first_goal_minute_home:
-                    if row["away_team"] == away_team_name:
-                        first_goal_stats[away_team_name] += 1
-                    else:
+                    if row["away_team"] == home_team_name:
                         first_goal_stats[home_team_name] += 1
+                    elif row["away_team"] == away_team_name:
+                        first_goal_stats[away_team_name] += 1
             
             stats = []
             total_goals = sum(first_goal_stats.values())
@@ -456,9 +456,17 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                         first_goal_in_band_away = min(away_goals_in_band, default=float('inf'))
                         
                         if first_goal_in_band_home < first_goal_in_band_away:
-                            first_goal_stats[home_team_name] += 1 if row["home_team"] == home_team_name else first_goal_stats[away_team_name] += 1
+                            # La squadra in casa del match storico ha segnato per prima
+                            if row["home_team"] == home_team_name:
+                                first_goal_stats[home_team_name] += 1
+                            elif row["home_team"] == away_team_name:
+                                first_goal_stats[away_team_name] += 1
                         elif first_goal_in_band_away < first_goal_in_band_home:
-                             first_goal_stats[away_team_name] += 1 if row["away_team"] == away_team_name else first_goal_stats[home_team_name] += 1
+                            # La squadra in trasferta del match storico ha segnato per prima
+                            if row["away_team"] == home_team_name:
+                                first_goal_stats[home_team_name] += 1
+                            elif row["away_team"] == away_team_name:
+                                first_goal_stats[away_team_name] += 1
                 
                 stats = []
                 total_goals = sum(first_goal_stats.values())
