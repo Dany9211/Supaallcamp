@@ -437,7 +437,7 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
                 calcola_media_gol(df_home, df_away, home_team_selected, away_team_selected, "HT", "gol_home_ht", "gol_away_ht")
                 calcola_clean_sheets(df_home, df_away, home_team_selected, away_team_selected, "gol_home_ht", "gol_away_ht", "HT")
                 calcola_primo_gol_stats(df_combined, home_team_selected, away_team_selected, "HT", 0, 45)
-                calcola_last_to_score(df_combined, 0, 45, home_team_selected, away_team_selected) # Aggiunto per l'HT
+                calcola_last_to_score(df_combined, 0, 45, home_team_selected, away_team_selected)
                 calcola_winrate(df_combined, "risultato_ht", "HT")
                 mostra_risultati_esatti(df_combined, "risultato_ht", "HT")
                 calcola_over_goals(df_combined, "gol_home_ht", "gol_away_ht", "HT")
@@ -479,59 +479,101 @@ if home_team_selected != "Seleziona..." and away_team_selected != "Seleziona..."
         st.header("Analisi Next Goal (In Play)")
         st.markdown("---")
 
-        st.subheader("Configurazione Partita in Corso")
-        use_dynamic_analysis = st.checkbox("Abilita Analisi Dinamica")
+        # Funzione per calcolare lo score a un minuto specifico
+        def get_score_at_minute(row, target_minute):
+            home_goals_minutes_str = str(row.get("minutaggio_gol", ""))
+            away_goals_minutes_str = str(row.get("minutaggio_gol_away", ""))
 
-        if use_dynamic_analysis:
-            st.info("Filtra per lo stato attuale della partita (es. 0-0 al 60').")
+            home_goals_in_match = [int(x) for x in home_goals_minutes_str.split(";") if x.isdigit() and int(x) <= target_minute]
+            away_goals_in_match = [int(x) for x in away_goals_minutes_str.split(";") if x.isdigit() and int(x) <= target_minute]
             
-            # Funzione per calcolare lo score a un minuto specifico
-            def get_score_at_minute(row, target_minute):
-                home_goals_minutes_str = str(row.get("minutaggio_gol", ""))
-                away_goals_minutes_str = str(row.get("minutaggio_gol_away", ""))
+            return len(home_goals_in_match), len(away_goals_in_match)
+        
+        # --- Sezione dinamica HT ---
+        with st.expander("Analisi Dinamica Primo Tempo (HT)", expanded=False):
+            use_dynamic_analysis_ht = st.checkbox("Abilita Analisi Dinamica HT")
 
-                home_goals_in_match = [int(x) for x in home_goals_minutes_str.split(";") if x.isdigit() and int(x) <= target_minute]
-                away_goals_in_match = [int(x) for x in away_goals_minutes_str.split(";") if x.isdigit() and int(x) <= target_minute]
+            if use_dynamic_analysis_ht:
+                st.info("Filtra per lo stato attuale della partita nel primo tempo (es. 0-0 al 30').")
                 
-                return len(home_goals_in_match), len(away_goals_in_match)
-
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                current_minute_dynamic = st.number_input("Minuto attuale", min_value=1, max_value=89, value=60)
-            with col2:
-                home_score_dynamic = st.number_input(f"Gol {home_team_selected}", min_value=0, value=0)
-            with col3:
-                away_score_dynamic = st.number_input(f"Gol {away_team_selected}", min_value=0, value=0)
-            
-            st.markdown(f"**Filtro applicato:** `Punteggio {home_score_dynamic}-{away_score_dynamic} al {current_minute_dynamic}'`")
-
-            # Filtra i dati
-            df_home_dynamic = df_home[df_home.apply(lambda row: get_score_at_minute(row, current_minute_dynamic) == (home_score_dynamic, away_score_dynamic), axis=1)]
-            df_away_dynamic = df_away[df_away.apply(lambda row: get_score_at_minute(row, current_minute_dynamic) == (home_score_dynamic, away_score_dynamic), axis=1)]
-            df_combined_dynamic = pd.concat([df_home_dynamic, df_away_dynamic], ignore_index=True)
-
-            if not df_combined_dynamic.empty:
-                st.write(f"Trovate **{len(df_combined_dynamic)}** partite storiche con punteggio di {home_score_dynamic}-{away_score_dynamic} al minuto {current_minute_dynamic}.")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    current_minute_dynamic_ht = st.number_input("Minuto attuale HT", min_value=1, max_value=44, value=30)
+                with col2:
+                    home_score_dynamic_ht = st.number_input(f"Gol {home_team_selected} (HT)", min_value=0, value=0)
+                with col3:
+                    away_score_dynamic_ht = st.number_input(f"Gol {away_team_selected} (HT)", min_value=0, value=0)
                 
-                # Chiamata alle funzioni statistiche con i dati filtrati
-                with st.expander("Statistiche Dinamiche", expanded=True):
-                    calcola_over_goals(df_combined_dynamic, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic}')")
-                    calcola_winrate(df_combined_dynamic, "risultato_ft", f"FT (dopo {current_minute_dynamic}')")
-                    calcola_btts(df_combined_dynamic, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic}')")
-                    calcola_primo_gol_stats(df_combined_dynamic, home_team_selected, away_team_selected, f"Prossimo gol (dopo {current_minute_dynamic}')", current_minute_dynamic + 1, 90)
-                    calcola_last_to_score(df_combined_dynamic, current_minute_dynamic + 1, 90, home_team_selected, away_team_selected)
-                
-                with st.expander("Bande Temporali Dinamiche", expanded=False):
-                    dynamic_time_bands_5min = [(i, i + 5) for i in range(current_minute_dynamic, 90, 5)]
-                    if dynamic_time_bands_5min:
-                        calcola_timeband_stats(df_combined_dynamic, dynamic_time_bands_5min, f"Dinamica 5 min (dal {current_minute_dynamic}')", home_team_selected, away_team_selected)
+                st.markdown(f"**Filtro applicato:** `Punteggio {home_score_dynamic_ht}-{away_score_dynamic_ht} al {current_minute_dynamic_ht}'`")
+
+                # Filtra i dati
+                df_home_dynamic_ht = df_home[df_home.apply(lambda row: get_score_at_minute(row, current_minute_dynamic_ht) == (home_score_dynamic_ht, away_score_dynamic_ht), axis=1)]
+                df_away_dynamic_ht = df_away[df_away.apply(lambda row: get_score_at_minute(row, current_minute_dynamic_ht) == (home_score_dynamic_ht, away_score_dynamic_ht), axis=1)]
+                df_combined_dynamic_ht = pd.concat([df_home_dynamic_ht, df_away_dynamic_ht], ignore_index=True)
+
+                if not df_combined_dynamic_ht.empty:
+                    st.write(f"Trovate **{len(df_combined_dynamic_ht)}** partite storiche con punteggio di {home_score_dynamic_ht}-{away_score_dynamic_ht} al minuto {current_minute_dynamic_ht} (HT).")
                     
-                    dynamic_time_bands_15min = [(i, i + 15) for i in range(current_minute_dynamic, 90, 15)]
-                    if dynamic_time_bands_15min:
-                        calcola_timeband_stats(df_combined_dynamic, dynamic_time_bands_15min, f"Dinamica 15 min (dal {current_minute_dynamic}')", home_team_selected, away_team_selected)
+                    # Chiamata alle funzioni statistiche con i dati filtrati
+                    calcola_over_goals(df_combined_dynamic_ht, "gol_home_ht", "gol_away_ht", f"HT (dopo {current_minute_dynamic_ht}')")
+                    calcola_winrate(df_combined_dynamic_ht, "risultato_ht", f"HT (dopo {current_minute_dynamic_ht}')")
+                    calcola_btts(df_combined_dynamic_ht, "gol_home_ht", "gol_away_ht", f"HT (dopo {current_minute_dynamic_ht}')")
+                    calcola_primo_gol_stats(df_combined_dynamic_ht, home_team_selected, away_team_selected, f"Prossimo gol (dopo {current_minute_dynamic_ht}')", current_minute_dynamic_ht + 1, 45)
+                    calcola_last_to_score(df_combined_dynamic_ht, current_minute_dynamic_ht + 1, 45, home_team_selected, away_team_selected)
+                    
+                    with st.expander("Bande Temporali Dinamiche HT", expanded=False):
+                        dynamic_time_bands_5min_ht = [(i, i + 5) for i in range(current_minute_dynamic_ht, 45, 5)]
+                        if dynamic_time_bands_5min_ht:
+                            calcola_timeband_stats(df_combined_dynamic_ht, dynamic_time_bands_5min_ht, f"Dinamica 5 min (dal {current_minute_dynamic_ht}')", home_team_selected, away_team_selected)
+                        
+                        dynamic_time_bands_15min_ht = [(i, i + 15) for i in range(current_minute_dynamic_ht, 45, 15)]
+                        if dynamic_time_bands_15min_ht:
+                            calcola_timeband_stats(df_combined_dynamic_ht, dynamic_time_bands_15min_ht, f"Dinamica 15 min (dal {current_minute_dynamic_ht}')", home_team_selected, away_team_selected)
+                else:
+                    st.warning("Nessuna partita storica trovata con i parametri dinamici specificati per il primo tempo. Prova a modificare minuto e punteggio.")
+        
+        # --- Sezione dinamica FT (originaria) ---
+        with st.expander("Analisi Dinamica Fine Partita (FT)", expanded=False):
+            use_dynamic_analysis_ft = st.checkbox("Abilita Analisi Dinamica FT")
 
-            else:
-                st.warning("Nessuna partita storica trovata con i parametri dinamici specificati. Prova a modificare minuto e punteggio.")
+            if use_dynamic_analysis_ft:
+                st.info("Filtra per lo stato attuale della partita (es. 0-0 al 60').")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    current_minute_dynamic_ft = st.number_input("Minuto attuale FT", min_value=1, max_value=89, value=60)
+                with col2:
+                    home_score_dynamic_ft = st.number_input(f"Gol {home_team_selected} (FT)", min_value=0, value=0)
+                with col3:
+                    away_score_dynamic_ft = st.number_input(f"Gol {away_team_selected} (FT)", min_value=0, value=0)
+                
+                st.markdown(f"**Filtro applicato:** `Punteggio {home_score_dynamic_ft}-{away_score_dynamic_ft} al {current_minute_dynamic_ft}'`")
+
+                # Filtra i dati
+                df_home_dynamic_ft = df_home[df_home.apply(lambda row: get_score_at_minute(row, current_minute_dynamic_ft) == (home_score_dynamic_ft, away_score_dynamic_ft), axis=1)]
+                df_away_dynamic_ft = df_away[df_away.apply(lambda row: get_score_at_minute(row, current_minute_dynamic_ft) == (home_score_dynamic_ft, away_score_dynamic_ft), axis=1)]
+                df_combined_dynamic_ft = pd.concat([df_home_dynamic_ft, df_away_dynamic_ft], ignore_index=True)
+
+                if not df_combined_dynamic_ft.empty:
+                    st.write(f"Trovate **{len(df_combined_dynamic_ft)}** partite storiche con punteggio di {home_score_dynamic_ft}-{away_score_dynamic_ft} al minuto {current_minute_dynamic_ft}.")
+                    
+                    # Chiamata alle funzioni statistiche con i dati filtrati
+                    calcola_over_goals(df_combined_dynamic_ft, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic_ft}')")
+                    calcola_winrate(df_combined_dynamic_ft, "risultato_ft", f"FT (dopo {current_minute_dynamic_ft}')")
+                    calcola_btts(df_combined_dynamic_ft, "gol_home_ft", "gol_away_ft", f"FT (dopo {current_minute_dynamic_ft}')")
+                    calcola_primo_gol_stats(df_combined_dynamic_ft, home_team_selected, away_team_selected, f"Prossimo gol (dopo {current_minute_dynamic_ft}')", current_minute_dynamic_ft + 1, 90)
+                    calcola_last_to_score(df_combined_dynamic_ft, current_minute_dynamic_ft + 1, 90, home_team_selected, away_team_selected)
+                    
+                    with st.expander("Bande Temporali Dinamiche FT", expanded=False):
+                        dynamic_time_bands_5min_ft = [(i, i + 5) for i in range(current_minute_dynamic_ft, 90, 5)]
+                        if dynamic_time_bands_5min_ft:
+                            calcola_timeband_stats(df_combined_dynamic_ft, dynamic_time_bands_5min_ft, f"Dinamica 5 min (dal {current_minute_dynamic_ft}')", home_team_selected, away_team_selected)
+                        
+                        dynamic_time_bands_15min_ft = [(i, i + 15) for i in range(current_minute_dynamic_ft, 90, 15)]
+                        if dynamic_time_bands_15min_ft:
+                            calcola_timeband_stats(df_combined_dynamic_ft, dynamic_time_bands_15min_ft, f"Dinamica 15 min (dal {current_minute_dynamic_ft}')", home_team_selected, away_team_selected)
+                else:
+                    st.warning("Nessuna partita storica trovata con i parametri dinamici specificati. Prova a modificare minuto e punteggio.")
     else:
         st.warning("Seleziona una squadra 'CASA' e una 'TRASFERTA' per avviare l'analisi.")
 else:
